@@ -215,8 +215,10 @@ I<its> parent is updated, and so on).
 
 Output is handled by one of C<Progress::Any::Output::*> modules. Each indicator
 can use one or more outputs. Currently available outputs: null, terminal, log
-(to L<Log::Any>), callback. Other possible outputs: IM/twitter/SMS, GUI,
-web/AJAX.
+(to L<Log::Any>), callback. Other possible output ideas: IM/twitter/SMS, GUI,
+web/AJAX, remote/RPC (over L<Riap> for example, so that
+L<Perinci::CmdLine>-based command-line clients can display progress update from
+remote functions).
 
 =item * message
 

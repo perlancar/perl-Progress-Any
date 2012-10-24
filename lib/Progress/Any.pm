@@ -162,7 +162,7 @@ A simple example:
  );
  for (1..10) {
      $progress->update(
-         current => $_,
+         pos     => $_,
          message => "Doing item #$_ ...",
      );
 
@@ -177,7 +177,7 @@ Another example, demonstrating multiple indicators:
 
  use Progress::Any;
 
- Progress::Any->set_default_output('Progress::Any::Output::LogAny');
+ Progress::Any->set_output(output=>Progress::Any::Output::LogAny->new);
  my $p1 = Progress::Any->get_indicator(task => 'main.download');
  my $p2 = Progress::Any->get_indicator(task => 'main.copy');
 
@@ -195,7 +195,9 @@ API is not stable yet.
 
 C<Progress::Any> is an interface for applications that want to display progress
 to users. It decouples progress updating and output, rather similar to how
-L<Log::Any> decouple log producers and consumers (output).
+L<Log::Any> decouple log producers and consumers (output). By setting output
+only in the application and not in modules, you separate the formatting/display
+concern from the logic.
 
 The list of features:
 

@@ -120,13 +120,17 @@ sub update {
 
 sub reset {
     my ($self, %args) = @_;
-    $self->update(%args, pos => 0);
+    $args{message} //= "Reset";
+    $args{pos} = 0;
+    $self->update(%args);
 }
 
 sub finish {
     my ($self, %args) = @_;
     if (defined $self->{target}) {
-        $self->update(%args, pos => $self->{target});
+        $args{message} //= "Finish";
+        $args{pos} = $self->{target};
+        $self->update(%args);
     }
 }
 

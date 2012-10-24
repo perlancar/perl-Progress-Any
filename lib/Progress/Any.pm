@@ -44,8 +44,8 @@ sub get_indicator {
     my $init   = delete($args{_init}) // 1;
     die "Unknown argument(s): ".join(", ", keys(%args)) if keys(%args);
     if (!$indicators{$task}) {
-        $indicators{$task} = bless({}, $class);
-        $indicators{$task}->init(task=>$task, target=>$target, output=>$output)
+        $indicators{$task} = bless({task=>$task}, $class);
+        $indicators{$task}->init(target=>$target, output=>$output)
             if $init;
     }
     $indicators{$task};

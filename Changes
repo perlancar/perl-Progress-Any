@@ -1,5 +1,11 @@
 Revision history for Progress-Any
 
+0.02    2012-10-24 (SHARYANTO)
+
+        Some tweaks/fixes: don't pre-init $progress, give default message to
+        reset() and finish().
+
+
 0.01    2012-10-24 (SHARYANTO)
 
         First, early release.

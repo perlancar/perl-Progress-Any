@@ -250,7 +250,7 @@ The main indicator. Equivalent to:
 
 None of the functions are exported by default, but they are exportable.
 
-=head2 get_indicator(%args)
+=head2 Progress::Any->get_indicator(%args)
 
 Get a progress indicator.
 
@@ -262,7 +262,7 @@ Arguments:
 
 =back
 
-=head2 set_output(%args)
+=head2 Progress::Any->set_output(%args)
 
 Set default output for newly created indicators. Arguments:
 
@@ -365,9 +365,13 @@ Reset indicator back to zero. Will also update output if necessary.
 
 Set indicator to 100%. Will also update output if necessary.
 
+
 =head1 SEE ALSO
 
-Other progress modules
+Other progress modules on CPAN: L<Term::ProgressBar>,
+L<Term::ProgressBar::Simple>, L<Time::Progress>, among others.
+
+Output modules: C<Progress::Any::Output::*>
 
 =cut
 

@@ -20,7 +20,7 @@ sub import {
     my $caller = caller();
     for (@args) {
         if ($_ eq '$progress') {
-            my $progress = $self->get_indicator(task => 'main');
+            my $progress = $self->get_indicator(task => 'main', _init=>0);
             {
                 no strict 'refs';
                 my $v = "$caller\::progress";
@@ -41,10 +41,12 @@ sub get_indicator {
     my $task   = delete($args{task}) // "main";
     my $target = delete($args{target});
     my $output = delete($args{output});
+    my $init   = delete($args{_init}) // 1;
     die "Unknown argument(s): ".join(", ", keys(%args)) if keys(%args);
     if (!$indicators{$task}) {
         $indicators{$task} = bless({}, $class);
-        $indicators{$task}->init(task=>$task, target=>$target, output=>$output);
+        $indicators{$task}->init(task=>$task, target=>$target, output=>$output)
+            if $init;
     }
     $indicators{$task};
 }

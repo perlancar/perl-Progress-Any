@@ -154,11 +154,11 @@ sub finish {
 A simple example:
 
  use Progress::Any qw($progress);
- use Progress::Any::Output::Terminal;
+ use Progress::Any::Output::TermProgressBar;
 
  $progress->init(
      target  => 10,
-     output  => Progress::Any::Output::Terminal->new(...),
+     output  => Progress::Any::Output::TermProgressBar->new(...),
  );
  for (1..10) {
      $progress->update(

@@ -161,7 +161,7 @@ A simple example:
 
      sleep 1;
  }
- $progress->finish; # no-op here, since update() has been called 10 times
+ $progress->finish; # pos will be set to target if not already so
 
 Another example, demonstrating multiple indicators:
 
@@ -172,7 +172,7 @@ Another example, demonstrating multiple indicators:
  my $p2 = Progress::Any->get_indicator(task => 'main.copy');
 
  $p1->set_target(target => 10);
- $p1->update();
+ $p1->update(); # by default increase pos by 1
  $p2->update();
 
 
@@ -185,7 +185,7 @@ API is not stable yet.
 
 C<Progress::Any> is an interface for applications that want to display progress
 to users. It decouples progress updating and output, rather similar to how
-L<Log::Any> decouple log producers and consumers (output). By setting output
+L<Log::Any> decouples log producers and consumers (output). By setting output
 only in the application and not in modules, you separate the formatting/display
 concern from the logic.
 

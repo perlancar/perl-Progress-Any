@@ -17,3 +17,5 @@ sub update {
 
 1;
 # ABSTRACT: Null output
+
+=for Pod::Coverage ^(new|update)$

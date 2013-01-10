@@ -151,7 +151,7 @@ A simple example:
 
  $progress->init(
      target  => 10,
-     output  => Progress::Any::Output::TermProgressBar->new(...),
+     output  => Progress::Any::Output::TermProgressBar->new(),
  );
  for (1..10) {
      $progress->update(

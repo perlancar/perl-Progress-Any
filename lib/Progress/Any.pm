@@ -363,5 +363,8 @@ L<Term::ProgressBar::Simple>, L<Time::Progress>, among others.
 
 Output modules: C<Progress::Any::Output::*>
 
+See examples on how Progress::Any is used by other modules: L<Perinci::CmdLine>
+(supplying progress object to functions), L<Git::Bunch> (using progress object).
+
 =cut
 

@@ -6,13 +6,6 @@ use warnings;
 
 use Progress::Any::Output::Null;
 
-#use overload
-#    '++' => \&_increment,
-#    '+=' => \&_increment,
-#    '--' => \&_decrement,
-#    '-=' => \&_decrement,
-#    ;
-
 # VERSION
 
 sub import {
@@ -165,9 +158,6 @@ A simple example:
          pos     => $_,
          message => "Doing item #$_ ...",
      );
-
-     # ditto, without message, demonstrating overloading
-     $progress++;
 
      sleep 1;
  }

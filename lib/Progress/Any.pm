@@ -176,17 +176,24 @@ will show something like this, respectively after 5 update()'s:
 Another example, demonstrating multiple indicators:
 
  use Progress::Any;
+ use Log::Any::App;
 
  Progress::Any->set_output(output=>Progress::Any::Output::LogAny->new);
  my $p1 = Progress::Any->get_indicator(task => 'main.download');
  my $p2 = Progress::Any->get_indicator(task => 'main.copy');
 
  $p1->set_target(target => 10);
- $p1->update(); # by default increase pos by 1
- $p2->update();
+ $p1->update(message => "downloading A"); # by default increase pos by 1
+ $p2->update(message => "copying A");
+ $p1->update(message => "downloading B");
+ $p2->update(message => "copying B");
 
 will show something like:
 
+ [1/10] downloading A
+ [1/10] copying A
+ [2/10] downloading B
+ [2/10] copying B
 
 
 =head1 STATUS

@@ -150,18 +150,28 @@ A simple example:
  use Progress::Any::Output::TermProgressBar;
 
  $progress->init(
-     target  => 10,
+     target  => 5,
      output  => Progress::Any::Output::TermProgressBar->new(),
- );
- for (1..10) {
+ ); # progress bar hasn't been drawn yet.
+ for (1..5) {
      $progress->update(
          pos     => $_,
          message => "Doing item #$_ ...",
-     );
+     ); # progress bar is drawn each at 20%, 40%, 60%, 80%, and 100%.
 
      sleep 1;
  }
  $progress->finish; # pos will be set to target if not already so
+
+will show something like this, respectively after 5 update()'s:
+
+  20% [======                           ]0m00s Left
+  40% [============                     ]0m01s Left
+  60% [==================               ]0m01s Left
+  80% [========================         ]0m00s Left
+
+
+(At 100%, the L<Term::ProgressBar> automatically cleans up the progress bar).
 
 Another example, demonstrating multiple indicators:
 
@@ -175,10 +185,14 @@ Another example, demonstrating multiple indicators:
  $p1->update(); # by default increase pos by 1
  $p2->update();
 
+will show something like:
+
+
 
 =head1 STATUS
 
-API is not stable yet.
+API might still change in the future before being declared stable, but so far I
+don't expect any major changes.
 
 
 =head1 DESCRIPTION
@@ -221,8 +235,12 @@ indicator.
 
 =item * undefined target
 
-Target can be undefined, so a bar output might not show any bar, but can still
-show messages.
+Target can be undefined, so a bar output might not show any bar (or show them,
+but without percentage indicator), but can still show messages.
+
+=item * retargetting
+
+Target can be changed in the middle of things.
 
 =back
 
@@ -237,8 +255,6 @@ The main indicator. Equivalent to:
 
 
 =head1 METHODS
-
-None of the functions are exported by default, but they are exportable.
 
 =head2 Progress::Any->get_indicator(%args)
 
@@ -267,6 +283,10 @@ indicators.
 
 If unset, will use parent task's output, or if no parent exists, default output
 (which is the null output).
+
+=item * init => BOOL (default: 1)
+
+Whether to init() the progress indicator, if it is not initialized yet.
 
 =back
 

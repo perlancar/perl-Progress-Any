@@ -144,45 +144,52 @@ sub finish {
 
 =head1 SYNOPSIS
 
-A simple example:
+In your module:
 
- use Progress::Any qw($progress);
- use Progress::Any::Output::TermProgressBar;
+ package MyApp;
+ use Progress::Any;
 
- $progress->init(
-     target  => 5,
-     output  => Progress::Any::Output::TermProgressBar->new(),
- ); # progress bar hasn't been drawn yet.
- for (1..5) {
-     $progress->update(
-         pos     => $_,
-         message => "Doing item #$_ ...",
-     ); # progress bar is drawn each at 20%, 40%, 60%, 80%, and 100%.
-
-     sleep 1;
+ sub download {
+     my @urls = @_;
+     return unless @urls;
+     my $progress = Progress::Any->get_indicator(task => "download");
+     $progress->pos(0);
+     $progress->target(~~@urls);
+     for my $url (@urls) {
+         # download the $url ...
+         $progress->update(message => "Downloaded $url");
+     }
+     $progress->finish;
  }
- $progress->finish; # pos will be set to target if not already so
 
-will show something like this, respectively after 5 update()'s:
+In your application:
 
-  20% [======                           ]0m00s Left
-  40% [============                     ]0m01s Left
-  60% [==================               ]0m01s Left
-  80% [========================         ]0m00s Left
+ use MyApp;
+ use Progress::Any::Output;
+ Progress::Any::Output->set('TermProgressBarColor');
 
+ MyApp::download("url1", "url2", "url3", "url4", "url5");
 
-(At 100%, the L<Term::ProgressBar> automatically cleans up the progress bar).
+When run, your application will display something like this, in succession:
 
-Another example, demonstrating multiple indicators:
+  20% [====== Downloaded url1           ]0m00s Left
+  40% [=======Downloaded url2           ]0m01s Left
+  60% [=======Downloaded url3           ]0m01s Left
+  80% [=======Downloaded url4==         ]0m00s Left
+
+(At 100%, the output automatically cleans up the progress bar).
+
+Another example, demonstrating multiple indicators and the LogAny output:
 
  use Progress::Any;
+ use Progress::Any::Output;
  use Log::Any::App;
 
- Progress::Any->set_output(output=>Progress::Any::Output::LogAny->new);
+ Progress::Any::Output->set('LogAny');
  my $p1 = Progress::Any->get_indicator(task => 'main.download');
  my $p2 = Progress::Any->get_indicator(task => 'main.copy');
 
- $p1->set_target(target => 10);
+ $p1->target(10);
  $p1->update(message => "downloading A"); # by default increase pos by 1
  $p2->update(message => "copying A");
  $p1->update(message => "downloading B");
@@ -191,24 +198,33 @@ Another example, demonstrating multiple indicators:
 will show something like:
 
  [1/10] downloading A
- [1/10] copying A
+ [1/?] copying A
  [2/10] downloading B
- [2/10] copying B
+ [2/?] copying B
 
 
 =head1 STATUS
 
-API might still change in the future before being declared stable, but so far I
-don't expect any major changes.
+API might still change, will be stabilized in 1.0.
 
 
 =head1 DESCRIPTION
 
 C<Progress::Any> is an interface for applications that want to display progress
 to users. It decouples progress updating and output, rather similar to how
-L<Log::Any> decouples log producers and consumers (output). By setting output
-only in the application and not in modules, you separate the formatting/display
-concern from the logic.
+L<Log::Any> decouples log producers and consumers (output). The API is also
+rather similar to Log::Any, except I<Adapter> is called I<Output> and
+I<category> is called I<task>.
+
+Progress::Any records position/target and calculation of times (elapsed,
+remaining). One of the output modules (Progress::Any::Output::*) displays this
+information.
+
+In your modules, you typically only needs to use Progress::Any, get one or more
+indicators, set position/target and update it during work. In your application,
+you use Progress::Any::Output and set/add one or more outputs to display the
+progress. By setting output only in the application and not in modules, you
+separate the formatting/display concern from the logic.
 
 The list of features:
 
@@ -263,7 +279,7 @@ The main indicator. Equivalent to:
 
 =head1 METHODS
 
-=head2 Progress::Any->get_indicator(%args)
+=head2 Progress::Any->get_indicator(%args) => OBJ
 
 Get a progress indicator.
 
@@ -273,46 +289,18 @@ Arguments:
 
 =item * task => STR (default: main)
 
-=back
-
-=head2 Progress::Any->set_output(%args)
-
-Set default output for newly created indicators. Arguments:
-
-=over 4
-
-=item * task => STR
-
-Select task to set the output for. If unset, will set for newly created
-indicators.
-
-=item * output => OBJ
-
-If unset, will use parent task's output, or if no parent exists, default output
-(which is the null output).
-
-=item * init => BOOL (default: 1)
-
-Whether to init() the progress indicator, if it is not initialized yet.
+If not specified will be set to caller's package + subroutine, e.g. if you are
+calling this method from C<main::foo>, then task will be set to C<main.foo>.
 
 =back
 
-=head2 $progress->init(%args)
+=head2 $progress->target([ NUM ]) => NUM
 
-Initialize the indicator. Should only be called once.
+Get or (re)set target. Can be left or set to undef.
 
-Arguments:
+=head2 $progress->pos([ NUM ]) => NUM
 
-=over 4
-
-=item * target => NUM
-
-=item * output => OBJ or ARRAY
-
-Set the output(s) for this indicator. If unset, will use the default indicator
-set by C<set_output>.
-
-=back
+Get or set current position.
 
 =head2 $progress->update(%args)
 
@@ -370,17 +358,13 @@ Output:
 
 =back
 
-=head2 $progress->set_target(target => $target)
+=head2 $progress->finish(%args)
 
-(Re-)set target. Will also update output if necessary.
+Set indicator to 100% and update output. Equivalent to:
 
-=head2 $progress->reset
+ $progress->update(pos => $progress->target, %args);
 
-Reset indicator back to zero. Will also update output if necessary.
-
-=head2 $progress->finish
-
-Set indicator to 100%. Will also update output if necessary.
+except that it will still display 100% even though target is unknown/undef.
 
 
 =head1 SEE ALSO

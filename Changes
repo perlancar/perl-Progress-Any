@@ -1,5 +1,27 @@
 Revision history for Progress-Any
 
+0.05    2013-05-16 (SHARYANTO) (not yet released)
+
+        [INCOMPATIBLE CHANGES]
+
+        - Revise API, now more resembles Log::Any and incompatible with previous
+          version of Progress::Any. Split output to Progress-Any-Output (like
+          Log-Any-Adapter is split from Log-Any), remove set_output(). Remove
+          init() and replace it with pos() and target() because we might need to
+          reinit (reset pos and target) any time. Remove 'inc' argument in
+          update() to make things more orthogonal (you can always do update(pos
+          => $progress->pos + $x). Check task syntax in get_indicator().
+
+        [ENHANCEMENTS]
+
+        - API: parent indicators now get update()'d also whenever we do
+          update()/pos($val)/target($val) on an indicator.
+
+        - Progress::Any is now the one which is responsible for calculating
+          elapsed time/ETA/% completion. Output now just displays stuffs. This
+          makes output simpler and reduce duplicated code.
+
+
 0.04    2013-01-10 (SHARYANTO)
 
         No functional changes. More POD tweaks/fixes.

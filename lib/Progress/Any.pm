@@ -1,9 +1,10 @@
 package Progress::Any;
 
-use 5.010;
+use 5.010001;
 use strict;
 use warnings;
 
+use Time::Duration qw();
 use Time::HiRes qw(time);
 
 # VERSION
@@ -33,9 +34,10 @@ our %outputs;    # key = task, value = [$outputobj, ...]
 # - pos (float*)
 # - finished (bool)
 # - ctime (float*) = creation time
-# - subtargets (float) = (computed) total of subtasks' targets (incl indirect)
-# - luelapseds (array of float*) = elapsed time since last updates (for calculating eta)
-# - luincs (array of float*) = pos increment of last updates (ditto)
+# - ctarget (float) = (computed) total of subtasks' targets (incl indirect)
+# - elapseds (array of float*) = elapsed time since last updates (for calculating eta)
+# - incs (array of float*) = pos increment of last updates (ditto)
+# - lutime (float) = last update time
 
 sub get_indicator {
     my ($class, %args) = @_;
@@ -75,7 +77,9 @@ sub get_indicator {
             }
             if (defined $target) {
                 if (defined $indicators{$partask}{target}) {
-                    $indicators{$partask}{ctarget} += $target;
+                    $indicators{$partask}{ctarget} += $target
+                        if !exists($indicators{$partask}{ctarget}) ||
+                            defined($indicators{$partask}{ctarget});
                 }
             } else {
                 $indicators{$partask}{ctarget} = undef;
@@ -147,6 +151,7 @@ sub pos {
     }
 }
 
+my $TIMES_HIST = 5;
 sub update {
     my ($self, %args) = @_;
 
@@ -170,31 +175,42 @@ sub update {
 
     # record times/increments
     my $inc = $self->{pos} - $oldpos;
-    push @{ $self->{luelapseds} },
-        $self->{lutime} ? $time-$self->{lutime} : $time-$self->{ctime};
-    push @{ $self->{luincs} }, $inc;
-    if (@{ $self->{luincs} } > 5) {
-        shift @{$self->{luelapseds}};
-        shift @{$self->{luincs}};
+    my $elapsed = $self->{lutime} ? $time-$self->{lutime}:$time-$self->{ctime};
+    push @{ $self->{incs} }, $inc;
+    push @{ $self->{elapseds} }, $elapsed;
+    if (@{ $self->{incs} } > $TIMES_HIST) {
+        shift @{$self->{elapseds}};
+        shift @{$self->{incs}};
     }
 
-    # update parents' pos
-    if ($self->{pos} != $oldpos) {
-        #
+    # update parents' pos & times
+    my $partask = $self->{task};
+    while (1) {
+        $partask =~ s/\.\w+\z// or last;
+        my $par = $indicators{$partask};
+        $par->{pos} += $inc;
+        push @{ $par->{incs} }, $inc;
+        push @{ $par->{elapseds} }, $elapsed;
+        if (@{ $par->{incs} } > $TIMES_HIST) {
+            shift @{$par->{elapseds}};
+            shift @{$par->{incs}};
+        }
     }
 
     # find output(s) and call it
     {
         my $task = $self->{task};
         while (1) {
-            next unless $outputs{$task};
-            for my $output (@{ $outputs{$task} }) {
-                $output->update(
-                    indicator => $indicators{$task},
-                    message   => $message,
-                    level     => $level,
-                    status    => $status,
-                );
+            if ($outputs{$task}) {
+                for my $output (@{ $outputs{$task} }) {
+                    $output->update(
+                        indicator => $indicators{$task},
+                        message   => $message,
+                        level     => $level,
+                        status    => $status,
+                        time      => $time,
+                    );
+                }
             }
             last unless $task =~ s/\.\w+\z//;
         }
@@ -206,6 +222,124 @@ sub update {
 sub finish {
     my ($self, %args) = @_;
     $self->update(pos=>$self->{target}, finished=>1, %args);
+}
+
+sub fill_template {
+    my ($self, $template, %args) = @_;
+
+    state $re = qr{( # all=1
+                       %
+                       ( #width=2
+                           -?\d+ )?
+                       ( #dot=3
+                           \.?)
+                       ( #prec=4
+                           \d+)?
+                       ( #conv=5
+                           [taepcCm%])
+                   )}x;
+    state $sub = sub {
+        my %args = @_;
+
+        my ($all, $width, $dot, $prec, $conv) = ($1, $2, $3, $4, $5);
+
+        my $p = $args{indicator};
+
+        my ($fmt, $sconv, $data);
+        if ($conv eq 't') {
+            $data = $p->{task};
+        } elsif ($conv eq 'a') {
+            $data = Time::Duration::concise(Time::Duration::duration(
+                $args{time} - $p->{ctime}));
+        } elsif ($conv =~ /[epC]/o) {
+            my $tot;
+            if (defined $p->{target}) {
+                $tot = $p->{target};
+                if (exists $p->{ctarget}) {
+                    if (defined $p->{ctarget}) {
+                        $tot += $p->{ctarget};
+                    } else {
+                        $tot = undef;
+                    }
+                }
+            }
+            if (!defined($tot)) {
+                $data = '?';
+            } else {
+                if ($conv eq 'e') {
+                    my $totinc = 0;
+                    my $totelapsed = 0;
+                    my $eta;
+                    my $rest = $tot - $self->{pos};
+                    if ($rest <= 0) {
+                        $eta = 0;
+                    } else {
+                        # first calculate by moving average
+                        for (0..@{ $self->{incs} }-1) {
+                            $totinc     += $self->{incs}[$_];
+                            $totelapsed += $self->{elapseds}[$_];
+                        }
+                        if ($totinc == 0) {
+                            # if not moving at all recently, calculate using
+                            # total average
+                            if ($self->{pos} > 0) {
+                                $totinc     = $self->{pos};
+                                $totelapsed = $args{time} - $self->{ctime};
+                            }
+                        }
+                        if ($totinc > 0) {
+                            $eta = $totelapsed * $rest/$totinc;
+                            say "D: AVG: totinc=$totinc, totelapsed=$totelapsed, eta=$eta";
+                        }
+                    }
+                    if (defined $eta) {
+                        # to prevent duration() produces "just now"
+                        $eta = 1 if $eta < 1;
+
+                        $data = Time::Duration::concise(
+                            Time::Duration::duration($eta));
+                    } else {
+                        $data = '?';
+                    }
+                } elsif ($conv eq 'p' || $conv eq 'C') {
+                    $sconv = 'f';
+                    $dot = '.';
+                    $prec //= 0;
+                    if ($conv eq 'p') {
+                        $data = $p->{pos} / $tot * 100.0;
+                        $width //= 3;
+                    } else {
+                        $data = $tot;
+                    }
+                } else {
+                    $data = "TODO";
+                }
+            }
+        } elsif ($conv eq 'c') {
+            $data = $p->{pos};
+            $sconv = 'f';
+            $dot = '.';
+            $prec //= 0;
+        } elsif ($conv eq 'm') {
+            $data = $args{message};
+        } elsif ($conv eq '%') {
+            $data = '%';
+        } else {
+            # return as-is
+            $fmt = '%s';
+            $data = $all;
+        }
+
+        # sprintf format
+        $fmt //= join("", grep {defined} (
+            "%", $width, $dot, $prec, $sconv//"s"));
+
+        sprintf $fmt, $data;
+
+    };
+    $template =~ s{$re}{$sub->(%args)}egox;
+
+    $template;
 }
 
 1;
@@ -306,11 +440,12 @@ You can use different indicator for each task/subtask.
 =item * customizable output
 
 Output is handled by one of C<Progress::Any::Output::*> modules. Currently
-available outputs: C<Null>, C<TermProgressBarColor> (display to terminal as
-progress bar), C<LogAny> (logging using L<Log::Any>), C<Callback>. Other
-possible output ideas: IM/Twitter/SMS, GUI, web/AJAX, remote/RPC (over L<Riap>
-for example, so that L<Perinci::CmdLine>-based command-line clients can display
-progress update from remote functions).
+available outputs: C<Null> (no output), C<TermMessage> (display as simple
+message on terminal), C<TermProgressBarColor> (display as color progress bar on
+terminal), C<LogAny> (log using L<Log::Any>), C<Callback> (call a subroutine).
+Other possible output ideas: IM/Twitter/SMS, GUI, web/AJAX, remote/RPC (over
+L<Riap> for example, so that L<Perinci::CmdLine>-based command-line clients can
+display progress update from remote functions).
 
 =item * multiple outputs
 
@@ -455,36 +590,43 @@ Available templates:
 
 =over
 
-=item * C<%a>
+=item * C<%(width)t>
 
-Elapsed (absolute) time. Time format is determined by the C<time_format>
-attribute.
+B<T>ask.
+
+=item * C<%(width)a>
+
+Elapsed time. Currently using L<Time::Duration> concise format, e.g. 10s, 1m40s,
+16m40s, 1d4h, and so on. Format might be configurable and localizable in the
+future.
 
 =item * C<%e>
 
-Estimated completion time. Time format is determined by the C<time_format>
-attribute.
+Estimated completion time. Currently using L<Time::Duration> concise format,
+e.g. 10s, 1m40s, 16m40s, 1d4h, and so on. Format might be configurable and
+localizable in the future.
 
 =item * C<%(width).(prec)p>
 
 Percentage of completion. You can also specify width and precision, like C<%f>
-in Perl sprintf.
+in Perl sprintf. Default is C<%3.0p>. If percentage is unknown (due to target
+being undef) will translate to C<?>.
 
 =item * C<%(width).(prec)c>
 
-Current position (pos).
+Current position (pos) (or B<c>ounter).
 
 =item * C<%(width).(prec)C>
 
-Target.
+Target (or total item B<c>ount). If undefined, will translate to C<?>.
 
 =item * C<%m>
 
-Message.
+B<M>essage. If message is unspecified, translate to empty string.
 
 =item * C<%%>
 
-A literal C<%>.
+A literal C<%> sign.
 
 =back
 

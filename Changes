@@ -1,5 +1,10 @@
 Revision history for Progress-Any
 
+0.09    2013-05-18 (SHARYANTO)
+
+        - Bugfix: double counting of children's targets.
+
+
 0.08    2013-05-18 (SHARYANTO)
 
         - Bugfix: update() didn't recognize 'finished' parameter.

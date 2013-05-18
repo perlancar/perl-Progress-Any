@@ -1,5 +1,13 @@
 Revision history for Progress-Any
 
+0.08    2013-05-18 (SHARYANTO)
+
+        - Bugfix: update() didn't recognize 'finished' parameter.
+
+        - Maintain a root-level indicator (task='') to capture updates from all
+          progress indicators.
+
+
 0.07    2013-05-18 (SHARYANTO)
 
         [ENHANCEMENTS]

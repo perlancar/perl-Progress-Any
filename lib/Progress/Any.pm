@@ -49,7 +49,7 @@ sub get_indicator {
         $task = $caller[0] eq '(eval)' ? 'main' : $caller[0];
         $task =~ s/::/./g;
     }
-    die "Invalid task syntax '$task'" unless $task =~ /\A\w+(\.\w+)*\z/;
+    die "Invalid task syntax '$task'" unless $task =~ /\A(?:\w+(\.\w+)*)?\z/;
     my $target   = delete($args{target});
     my $pos      = delete($args{pos}) // 0;
     my $finished = delete($args{finished});
@@ -67,7 +67,7 @@ sub get_indicator {
         # automatically initialize/update parent tasks
         my $partask = $task;
         while (1) {
-            last unless $partask =~ s/\.\w+\z//;
+            last unless $partask =~ s/\.?\w+\z//;
             if (!$indicators{$partask}) {
                 $indicators{$partask} = bless({
                     task     => $partask,
@@ -101,7 +101,7 @@ sub target {
         # update parents
         my $partask = $self->{task};
         while (1) {
-            $partask =~ s/\.\w+\z// or last;
+            $partask =~ s/\.?\w+\z// or last;
             if (defined $target) {
                 if (defined $oldtarget) {
                     $indicators{$partask}{ctarget} += $target-$oldtarget;
@@ -110,7 +110,8 @@ sub target {
                     $indicators{$partask}{ctarget} = 0;
                   RECOUNT:
                     for (keys %indicators) {
-                        next unless /\Q$partask\E\.\w+\z/;
+                        my $prefix = length($partask) ? "$partask." : "";
+                        next unless /\Q$prefix\E\w+\z/;
                         if (!defined($indicators{$_}{target})) {
                             $indicators{$partask}{ctarget} = undef;
                             last RECOUNT;
@@ -149,7 +150,7 @@ sub pos {
         # update parents
         my $partask = $self->{task};
         while (1) {
-            $partask =~ s/\.\w+\z// or last;
+            $partask =~ s/\.?\w+\z// or last;
             $indicators{$partask}{pos} += $pos-$oldpos;
         }
 
@@ -197,7 +198,7 @@ sub update {
     # update parents' pos & times
     my $partask = $self->{task};
     while (1) {
-        $partask =~ s/\.\w+\z// or last;
+        $partask =~ s/\.?\w+\z// or last;
         my $par = $indicators{$partask};
         $par->{pos} += $inc;
         push @{ $par->{incs} }, $inc;
@@ -223,7 +224,7 @@ sub update {
                     );
                 }
             }
-            last unless $task =~ s/\.\w+\z//;
+            last unless $task =~ s/\.?\w+\z//;
         }
     }
 
@@ -496,8 +497,8 @@ Arguments:
 =item * task => STR (default: main)
 
 If not specified will be set to caller's package (C<::> will be replaced with
-C<.>), e.g. if you are calling this method from C<main::foo>, then task will be
-set to C<main.foo>. If caller is code inside eval, C<main> will be used instead.
+C<.>), e.g. if you are calling this method from C<main::foo()>, then task will
+be set to C<main>. If caller is code inside eval, C<main> will be used instead.
 
 =item * target => NUM (default: undef)
 

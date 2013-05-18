@@ -175,11 +175,14 @@ sub update {
     $self->{pos} = 0 if $self->{pos} < 0;
     $self->{pos} = $self->{target} if
         defined($self->{target}) && $self->{pos} > $self->{target};
-    my $message = delete($args{message});
-    my $level   = delete($args{level});
-    my $status  = delete($args{status});
+    my $message  = delete($args{message});
+    my $level    = delete($args{level});
+    my $status   = delete($args{status});
+    my $finished = delete($args{finished});
     die "Unknown argument(s) to update(): ".join(", ", keys(%args))
         if keys(%args);
+
+    $self->{finished} = $finished;
 
     # record times/increments
     my $inc = $self->{pos} - $oldpos;

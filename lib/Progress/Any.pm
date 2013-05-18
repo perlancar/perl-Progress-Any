@@ -290,7 +290,7 @@ sub fill_template {
                         }
                         if ($totinc > 0) {
                             $eta = $totelapsed * $rest/$totinc;
-                            say "D: AVG: totinc=$totinc, totelapsed=$totelapsed, eta=$eta";
+                            #say "D: AVG: totinc=$totinc, totelapsed=$totelapsed, eta=$eta";
                         }
                     }
                     if (defined $eta) {

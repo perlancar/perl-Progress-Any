@@ -1,5 +1,13 @@
 Revision history for Progress-Any
 
+0.06    2013-05-18 (SHARYANTO)
+
+        [INCOMPATIBLE CHANGES]
+
+        - Change default task in get_indicator() to be caller's package, not
+          subroutine.
+
+
 0.05    2013-05-18 (SHARYANTO)
 
         Happy birthday, bro!

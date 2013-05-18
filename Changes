@@ -1,5 +1,12 @@
 Revision history for Progress-Any
 
+0.07    2013-05-18 (SHARYANTO)
+
+        [ENHANCEMENTS]
+
+        - Add total_target().
+
+
 0.06    2013-05-18 (SHARYANTO)
 
         [INCOMPATIBLE CHANGES]

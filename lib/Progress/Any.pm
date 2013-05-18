@@ -264,6 +264,7 @@ sub fill_template {
                 $args{time} - $p->{ctime}));
         } elsif ($conv =~ /[epC]/o) {
             my $tot = $p->total_target;
+            $width //= 3 if $conv eq 'p';
             if (!defined($tot)) {
                 $data = '?';
             } else {
@@ -308,12 +309,9 @@ sub fill_template {
                     $prec //= 0;
                     if ($conv eq 'p') {
                         $data = $p->{pos} / $tot * 100.0;
-                        $width //= 3;
                     } else {
                         $data = $tot;
                     }
-                } else {
-                    $data = "TODO";
                 }
             }
         } elsif ($conv eq 'c') {

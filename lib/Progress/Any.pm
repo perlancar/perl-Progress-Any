@@ -45,7 +45,8 @@ sub get_indicator {
     my $task   = delete($args{task});
     if (!defined($task)) {
         my @caller = caller(0);
-        $task = $caller[3] eq '(eval)' ? 'main' : $caller[3];
+        #say "D:caller=".join(",",map{$_//""} @caller);
+        $task = $caller[0] eq '(eval)' ? 'main' : $caller[0];
         $task =~ s/::/./g;
     }
     die "Invalid task syntax '$task'" unless $task =~ /\A\w+(\.\w+)*\z/;
@@ -494,10 +495,9 @@ Arguments:
 
 =item * task => STR (default: main)
 
-If not specified will be set to caller's package + subroutine (C<::> will be
-replaced with C<.>), e.g. if you are calling this method from C<main::foo>, then
-task will be set to C<main.foo>. If caller is code inside eval, C<main> will be
-used instead.
+If not specified will be set to caller's package (C<::> will be replaced with
+C<.>), e.g. if you are calling this method from C<main::foo>, then task will be
+set to C<main.foo>. If caller is code inside eval, C<main> will be used instead.
 
 =item * target => NUM (default: undef)
 

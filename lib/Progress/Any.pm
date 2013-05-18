@@ -450,7 +450,7 @@ display progress update from remote functions).
 
 One or more outputs can be used to display one or more indicators.
 
-=item * hierarchiecal progress
+=item * hierarchical progress
 
 A task can be divided into subtasks. If a subtask is updated, its parent task
 (and its parent, and so on) are also updated proportionally.

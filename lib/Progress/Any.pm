@@ -132,6 +132,13 @@ sub target {
     }
 }
 
+sub total_target {
+    my $self = shift;
+    return undef unless defined($self->{target});
+    return undef if exists($self->{ctarget}) && !defined($self->{ctarget});
+    $self->{target} + ($self->{ctarget} // 0);
+}
+
 sub pos {
     my $self = shift;
     if (@_) {
@@ -253,17 +260,7 @@ sub fill_template {
             $data = Time::Duration::concise(Time::Duration::duration(
                 $args{time} - $p->{ctime}));
         } elsif ($conv =~ /[epC]/o) {
-            my $tot;
-            if (defined $p->{target}) {
-                $tot = $p->{target};
-                if (exists $p->{ctarget}) {
-                    if (defined $p->{ctarget}) {
-                        $tot += $p->{ctarget};
-                    } else {
-                        $tot = undef;
-                    }
-                }
-            }
+            my $tot = $p->total_target;
             if (!defined($tot)) {
                 $data = '?';
             } else {
@@ -519,6 +516,11 @@ Get or (re)set target. Can be left or set to undef.
 =head2 $progress->pos([ NUM ]) => NUM
 
 Get or set the current position.
+
+=head2 $progress->total_target => NUM
+
+Get total target, which is target plus all the descendant's targets. If any of
+those is undefined, return undef.
 
 =head2 $progress->update(%args)
 

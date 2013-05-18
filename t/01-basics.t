@@ -9,21 +9,37 @@ use Progress::Any;
 
 %Progress::Any::indicators = ();
 
-subtest "get_indicator" => sub {
-    Progress::Any->get_indicator(task=>"a.b", target=>10);
-    Progress::Any->get_indicator(task=>"a.b.d", target=>7, pos=>2);
-    Progress::Any->get_indicator(task=>"a.c", target=>5, pos=>1);
+subtest "get_indicator, pos, target, total_target" => sub {
+    my $p_ab = Progress::Any->get_indicator(task=>"a.b", target=>10);
+    is($p_ab->pos, 0, "a.b's pos");
+    is($p_ab->target, 10, "a.b's target");
+    is($p_ab->total_target, 10, "a.b's total target");
 
-    is($Progress::Any::indicators{"a"}{target}, 0, "a's target");
-    is($Progress::Any::indicators{"a"}{ctarget}, 22, "a's ctarget");
-    is($Progress::Any::indicators{"a"}{pos}, 3, "a's pos");
-    is($Progress::Any::indicators{"a.b"}{ctarget}, 7, "a.b's ctarget");
-    is($Progress::Any::indicators{"a.b"}{pos}, 2, "a.b's pos");
+    my $p_a  = Progress::Any->get_indicator(task=>"a");
+    is($p_a->pos, 0, "a's target");
+    is($p_a->target, 0, "a's target");
+    is($p_a->total_target, 10, "a's total target");
 
-    Progress::Any->get_indicator(task=>"a.b.e");
+    my $p_abd = Progress::Any->get_indicator(task=>"a.b.d", target=>7, pos=>2);
+    is($p_abd->pos, 2, "a.b.d's pos");
+    is($p_abd->target, 7, "a.b.d's target");
+    is($p_abd->total_target, 7, "a.b.d's total target");
+    is($p_ab->pos, 2, "a.b's pos");
+    is($p_ab->total_target, 17, "a.b's total target");
+    is($p_a->total_target, 17, "a's total target");
 
-    ok(!defined($Progress::Any::indicators{"a"}{ctarget}), "a's ctarget becomes undefined");
-    ok(!defined($Progress::Any::indicators{"a.b"}{ctarget}), "a.b's ctarget becomes undefined");
+    my $p_ac = Progress::Any->get_indicator(task=>"a.c", target=>5, pos=>1);
+    is($p_ac->pos, 1, "a.c's pos");
+    is($p_ac->target, 5, "a.c's target");
+    is($p_ac->total_target, 5, "a.c's total target");
+    is($p_a->pos, 3, "a's pos");
+    is($p_a->total_target, 22, "a's total target");
+
+    my $p_abe = Progress::Any->get_indicator(task=>"a.b.e");
+    is($p_abe->pos, 0, "a.e's pos");
+    ok(!defined($p_abe->target), "a.e's target is undef");
+    ok(!defined($p_ab->total_target), "a.b's total target becomes undef");
+    ok(!defined($p_a->total_target), "a's total target becomes undef");
 };
 
 subtest "target" => sub {

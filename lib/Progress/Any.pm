@@ -111,14 +111,13 @@ sub target {
                   RECOUNT:
                     for (keys %indicators) {
                         my $prefix = length($partask) ? "$partask." : "";
-                        next unless /\Q$prefix\E\w+\z/;
+                        next unless /\Q$prefix\E\w+/;
                         if (!defined($indicators{$_}{target})) {
                             $indicators{$partask}{ctarget} = undef;
                             last RECOUNT;
                         } else {
                             $indicators{$partask}{ctarget} +=
-                                $indicators{$_}{target} +
-                                    ($indicators{$_}{ctarget} // 0);
+                                $indicators{$_}{target};
                         }
                     }
                 }

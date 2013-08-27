@@ -26,21 +26,51 @@ sub import {
     }
 }
 
-our %indicators; # key = task
-our %outputs;    # key = task, value = [$outputobj, ...]
+our %indicators; # key = task name
+our %outputs;    # key = task name, value = [$outputobj, ...]
 
-# attributes of indicator:
+# attributes of an indicator/task:
+# - title (str*) = task's title
 # - target (float)
 # - pos (float*)
 # - finished (bool)
 # - ctime (float*) = creation time
-# - ctarget (float) = (computed) total of subtasks' targets (incl indirect)
-# - elapseds (array of float*) = elapsed time since last updates (for calculating eta)
-# - incs (array of float*) = pos increment of last updates (ditto)
-# - lutime (float) = last update time
+# - st_target (float) = sum of all subtasks' target
+# - remaining (float) = estimated remaining time
+# - pctcomp (float) = calculated, percentage of completion
+# - st_pos (float*) = sum of all subtasks' pos
+# - st_min_ctime (float) = smallest ctime from subtasks
+# - st_remaining (float) = sum of all subtasks' remaining time
+# - lutime (float) = last update time, when displaying information
+#                    remaining or elapsed need to be adjusted with (now-lutime)
+
+# return 1 if created, 0 if already created/initialized
+sub _init_indicator {
+    my ($class, $task) = @_;
+    return 0 if $indicators{$task};
+
+    $indicators{$task} = bless({
+        task      => $task,
+        title     => $task,
+        target    => 0,
+        pos       => 0,
+        remaining => undef,
+        ctime     => time(),
+        finished  => 0,
+    }, $class);
+
+    # if we create an indicator named a.b.c, we must also create a.b, a, and ''.
+    if ($task =~ s/\.?\w+\z//) {
+        $class->_init_indicator($task);
+    }
+
+    1;
+}
 
 sub get_indicator {
     my ($class, %args) = @_;
+
+    my %oargs = %args;
 
     my $task   = delete($args{task});
     if (!defined($task)) {
@@ -50,52 +80,84 @@ sub get_indicator {
         $task =~ s/::/./g;
     }
     die "Invalid task syntax '$task'" unless $task =~ /\A(?:\w+(\.\w+)*)?\z/;
-    my $target   = delete($args{target});
-    my $pos      = delete($args{pos}) // 0;
-    my $finished = delete($args{finished});
+
+    my $target    = delete($args{target});
+    my $pos       = delete($args{pos}) // 0;
+    my $title     = delete($args{title}) // $task;
+    my $remaining = delete($args{remaining});
     die "Unknown argument(s) to get_indicator(): ".join(", ", keys(%args))
         if keys(%args);
-    if (!$indicators{$task}) {
-        $indicators{$task} = bless({
-            task     => $task,
-            ctime    => time(),
-            finished => $finished,
-            target   => $target,
-            pos      => $pos,
-        }, $class);
+    $class->_init_indicator($task);
+    my $p = $indicators{$task};
+    $p->title($title)     if exists($oargs{title});
+    $p->remaining($title) if exists($oargs{remaining});
+    $p->target($target)   if exists($oargs{target});
+    $p->pos($pos)         if exists($oargs{pos});
 
-        # automatically initialize/update parent tasks
-        my $partask = $task;
-        while (1) {
-            last unless $partask =~ s/\.?\w+\z//;
-            if (!$indicators{$partask}) {
-                $indicators{$partask} = bless({
-                    task     => $partask,
-                    pos      => 0,
-                    target   => 0,
-                    ctime    => time(),
-                }, $class);
-            }
-            if (defined $target) {
-                if (defined $indicators{$partask}{target}) {
-                    $indicators{$partask}{ctarget} += $target
-                        if !exists($indicators{$partask}{ctarget}) ||
-                            defined($indicators{$partask}{ctarget});
-                }
-            } else {
-                $indicators{$partask}{ctarget} = undef;
-            }
-            $indicators{$partask}{pos} += $pos;
-        }
+    $p;
+}
+
+sub title {
+    my $self = shift;
+    if (@_) {
+        my $oldtitle = $self->{title};
+        my $title    = shift;
+        $self->{title} = $title;
+        return $self;
+    } else {
+        return $self->{title};
     }
-    $indicators{$task};
+}
+
+sub remaining {
+    my $self = shift;
+    if (@_) {
+        my $val = shift;
+        die "Invalid value for remaining, must be a positive number"
+            unless !defined($val) || $val >= 0;
+        $self->{remaining} = $val;
+        return $self;
+    } else {
+        return $self->{remaining};
+    }
 }
 
 sub target {
     my $self = shift;
     if (@_) {
+        my $val = shift;
+        die "Invalid value for target, must be a positive number"
+            unless !defined($val) || $val >= 0;
+        $self->_update(target=>$val);
+        return $self;
+    } else {
+        return $self->{target};
+    }
+}
+
+sub pos {
+    my $self = shift;
+    if (@_) {
+        my $val = shift;
+        die "Invalid value for pos, must be a positive number"
+            unless defined($val) && $val >= 0;
+        $self->_update(pos=>$val);
+        return $self;
+    } else {
+        return $self->{pos};
+    }
+}
+
+# update an indicator's target/pos, and update pctcomp/remaining as well as
+# parents' st_* attributes.
+sub _update {
+    my ($self, %args) = @_;
+
+    return unless exists($args{target}) || exists($args{pos});
+
+    if (exists $args{target}) {
         my $oldtarget = $self->{target};
-        my $target    = shift;
+        my $target    = $args{target};
         $self->{target} = $target;
 
         # update parents
@@ -122,91 +184,39 @@ sub target {
                     }
                 }
             } else {
-                $indicators{$partask}{ctarget} = undef;
+                # target is changed to undef
+                $indicators{$partask}{target_} = undef;
             }
         }
 
-        return $self;
-    } else {
-        return $self->{target};
     }
-}
 
-sub total_target {
-    my $self = shift;
-    return undef unless defined($self->{target});
-    return undef if exists($self->{ctarget}) && !defined($self->{ctarget});
-    $self->{target} + ($self->{ctarget} // 0);
-}
-
-sub pos {
-    my $self = shift;
-    if (@_) {
+    if (exists $args{pos}) {
         my $oldpos = $self->{pos};
-        my $pos    = shift;
-        $self->{pos} = $pos;
+        my $pos    = $args{pos};
+        $pos = $self->{target} if
+            defined($self->{target}) && $pos > $self->{target};
 
         # update parents
-        my $partask = $self->{task};
-        while (1) {
-            $partask =~ s/\.?\w+\z// or last;
-            $indicators{$partask}{pos} += $pos-$oldpos;
-        }
-
-        return $self;
-    } else {
-        return $self->{pos};
     }
 }
 
-my $TIMES_HIST = 5;
 sub update {
     my ($self, %args) = @_;
 
-    my $time = time();
-    my $oldpos = $self->{pos};
+    my $pos = delete($args{pos}) // $self->{pos} + 1;
+    $self->_pos($pos);
 
-    # check arguments
-    if (defined(my $pos = delete($args{pos}))) {
-        $self->{pos} = $pos;
-    } else {
-        $self->{pos} += 1;
-    }
-    $self->{pos} = 0 if $self->{pos} < 0;
-    $self->{pos} = $self->{target} if
-        defined($self->{target}) && $self->{pos} > $self->{target};
     my $message  = delete($args{message});
     my $level    = delete($args{level});
-    my $status   = delete($args{status});
     my $finished = delete($args{finished});
     die "Unknown argument(s) to update(): ".join(", ", keys(%args))
         if keys(%args);
 
+    my $now = time();
+
     $self->{finished} = $finished;
-
-    # record times/increments
-    my $inc = $self->{pos} - $oldpos;
-    my $elapsed = $self->{lutime} ? $time-$self->{lutime}:$time-$self->{ctime};
-    push @{ $self->{incs} }, $inc;
-    push @{ $self->{elapseds} }, $elapsed;
-    if (@{ $self->{incs} } > $TIMES_HIST) {
-        shift @{$self->{elapseds}};
-        shift @{$self->{incs}};
-    }
-
-    # update parents' pos & times
-    my $partask = $self->{task};
-    while (1) {
-        $partask =~ s/\.?\w+\z// or last;
-        my $par = $indicators{$partask};
-        $par->{pos} += $inc;
-        push @{ $par->{incs} }, $inc;
-        push @{ $par->{elapseds} }, $elapsed;
-        if (@{ $par->{incs} } > $TIMES_HIST) {
-            shift @{$par->{elapseds}};
-            shift @{$par->{incs}};
-        }
-    }
+    $self->{lutime}   = $now;
 
     # find output(s) and call it
     {
@@ -218,16 +228,13 @@ sub update {
                         indicator => $indicators{$task},
                         message   => $message,
                         level     => $level,
-                        status    => $status,
-                        time      => $time,
+                        time      => $now,
                     );
                 }
             }
             last unless $task =~ s/\.?\w+\z//;
         }
     }
-
-    $self->{lutime} = $time;
 }
 
 sub finish {
@@ -247,7 +254,7 @@ sub fill_template {
                        ( #prec=4
                            \d+)?
                        ( #conv=5
-                           [taepcCm%])
+                           [taeEpcCm%])
                    )}x;
     state $sub = sub {
         my %args = @_;
@@ -262,13 +269,24 @@ sub fill_template {
         } elsif ($conv eq 'a') {
             $data = Time::Duration::concise(Time::Duration::duration(
                 $args{time} - $p->{ctime}));
-        } elsif ($conv =~ /[epC]/o) {
-            my $tot = $p->total_target;
+        } elsif ($conv =~ /[eEpC]/o) {
+            my $tot = $p->_total_target;
             $width //= 3 if $conv eq 'p';
+
             if (!defined($tot)) {
-                $data = '?';
+                if ($conv eq 'E') {
+                    # to prevent duration() produces "just now"
+                    my $tot = $tot || 1;
+
+                    $data = Time::Duration::concise(
+                        Time::Duration::duration($tot));
+                    $data = "$data elapsed"; # XXX localize
+                } else {
+                    # can't estimate
+                    $data = '?';
+                }
             } else {
-                if ($conv eq 'e') {
+                if ($conv eq 'e' || $conv eq 'E') {
                     my $totinc = 0;
                     my $totelapsed = 0;
                     my $eta;
@@ -300,8 +318,20 @@ sub fill_template {
 
                         $data = Time::Duration::concise(
                             Time::Duration::duration($eta));
+                        if ($conv eq 'E') {
+                            $data = "$data left"; # XXX localize
+                        }
                     } else {
-                        $data = '?';
+                        if ($conv eq 'E') {
+                            # to prevent duration() produces "just now"
+                            my $totelapsed = $totelapsed || 1;
+
+                            $data = Time::Duration::concise(
+                                Time::Duration::duration($totelapsed));
+                            $data = "$data elapsed"; # XXX localize
+                        } else {
+                            $data = '?';
+                        }
                     }
                 } elsif ($conv eq 'p' || $conv eq 'C') {
                     $sconv = 'f';
@@ -336,7 +366,7 @@ sub fill_template {
         sprintf $fmt, $data;
 
     };
-    $template =~ s{$re}{$sub->(%args)}egox;
+    $template =~ s{$re}{$sub->(%args, indicator=>$self)}egox;
 
     $template;
 }
@@ -399,10 +429,10 @@ Another example, demonstrating multiple indicators and the LogAny output:
 
 will show something like:
 
- [1/10] downloading A
- [1/?] copying A
- [2/10] downloading B
- [2/?] copying B
+ [main.download] [1/10] downloading A
+ [main.copy] [1/?] copying A
+ [main.download] [2/10] downloading B
+ [main.copy] [2/?] copying B
 
 
 =head1 STATUS
@@ -418,15 +448,15 @@ L<Log::Any> decouples log producers and consumers (output). The API is also
 rather similar to Log::Any, except I<Adapter> is called I<Output> and
 I<category> is called I<task>.
 
-Progress::Any records position/target and calculation of times (elapsed,
-remaining). One of the output modules (Progress::Any::Output::*) displays this
-information.
+Progress::Any records position/target and calculates elapsed time, estimated
+remaining time, and percentage of completion. One or more output modules
+(Progress::Any::Output::*) display this information.
 
-In your modules, you typically only needs to use Progress::Any, get one or more
-indicators, set position/target and update it during work. In your application,
-you use Progress::Any::Output and set/add one or more outputs to display the
-progress. By setting output only in the application and not in modules, you
-separate the formatting/display concern from the logic.
+In your modules, you typically only need to use Progress::Any, get one or more
+indicators, set target and update it during work. In your application, you use
+Progress::Any::Output and set/add one or more outputs to display the progress.
+By setting output only in the application and not in modules, you separate the
+formatting/display concern from the logic.
 
 The list of features:
 
@@ -493,20 +523,28 @@ Arguments:
 
 =item * task => STR (default: main)
 
-If not specified will be set to caller's package (C<::> will be replaced with
-C<.>), e.g. if you are calling this method from C<main::foo()>, then task will
-be set to C<main>. If caller is code inside eval, C<main> will be used instead.
+Required. Specify task name. If not specified will be set to caller's package
+(C<::> will be replaced with C<.>), e.g. if you are calling this method from
+C<main::foo()>, then task will be set to C<main>. If caller is code inside eval,
+C<main> will be used instead.
+
+=item * title => STR (default is task name)
+
+Optional. Specify task title. Task title is a longer description for a task and
+can contain spaces and other characters. For example, for a task called C<copy>,
+its title might be C<Copying files to remote server>.
+
+=item * remaining => NUM (default: undef)
+
+Optional. Can be used to give estimation for remaining time, in seconds.
 
 =item * target => NUM (default: undef)
 
-Optional. Can be used to initialize target. Will only be done once for the same
-task and not for the subsequent get_indicator() calls on the same task.
+Optional. Can be used to initialize target.
 
 =item * pos => NUM (default: 0)
 
-Optional. Can be used to initialize starting position. Will only be done once
-for the same task and not for the subsequent get_indicator() calls on the same
-task.
+Optional. Can be used to initialize starting position.
 
 =back
 
@@ -516,12 +554,18 @@ Get or (re)set target. Can be left or set to undef.
 
 =head2 $progress->pos([ NUM ]) => NUM
 
-Get or set the current position.
+Get or set the current position. Number must be defined and greater than or
+equal to zero.
 
-=head2 $progress->total_target => NUM
+=head2 $progress->title([ STR ]) => STR
 
-Get total target, which is target plus all the descendant's targets. If any of
-those is undefined, return undef.
+Get or set the task title.
+
+=head2 $progress->remaining([ NUM ]) => NUM
+
+Get or set estimated remaining time, in seconds. Number must be defined and
+greater than or equal to zero. Note that estimated remaining time will be
+recalculated everytime C<pos> or C<target> is updated.
 
 =head2 $progress->update(%args)
 
@@ -548,29 +592,6 @@ of this update. Default is C<normal> (or C<low> for fractional update), but can
 be set to C<high> or C<low>. Output can choose to ignore updates lower than a
 certain level.
 
-=item * status => STR
-
-Set the status of this update, usually done on finish(). Some outputs
-interpret/display this, for example the C<TermMessage> output:
-
-Update:
-
- my $progress = Progress::Any->get_indicator(
-     task => 'copy', message => 'Copying file ...');
- $progress->update(message=>'file1.txt');
-
-Output:
-
- Copying file ... file1.txt
-
-Update:
-
- $progress->finish(status=>'success');
-
-Output:
-
- Copying file ... success
-
 =item * finished => BOOL
 
 Can be set to 1 (e.g. by finish()) if task is completed.
@@ -588,44 +609,70 @@ except to record completion.
 
 =head2 $progress->fill_template($template, \%values)
 
-Fill template with values, like in sprintf. Usually used by output modules.
+Fill template with values, like in C<sprintf()>. Usually used by output modules.
 Available templates:
 
 =over
 
 =item * C<%(width)t>
 
-B<T>ask.
+Task name. C<width> is optional, an integer, like in C<sprintf()>, can be
+negative to mean left-justify instead of right.
 
-=item * C<%(width)a>
+=item * C<%(width)e>
 
 Elapsed time. Currently using L<Time::Duration> concise format, e.g. 10s, 1m40s,
 16m40s, 1d4h, and so on. Format might be configurable and localizable in the
-future.
+future. Default width is -8. Examples:
 
-=item * C<%e>
+ 2m30s
+ 10s
 
-Estimated completion time. Currently using L<Time::Duration> concise format,
-e.g. 10s, 1m40s, 16m40s, 1d4h, and so on. Format might be configurable and
-localizable in the future.
+=item * C<%(width)r>
+
+Estimated remaining time. Currently using L<Time::Duration> concise format, e.g.
+10s, 1m40s, 16m40s, 1d4h, and so on. Will show C<?> if unknown. Format might be
+configurable and localizable in the future. Default width is -8. Examples:
+
+ 1m40s
+ 5s
+
+=item * C<%(width)d>
+
+Estimated total duration of task (which equals to elapsed + remaining time).
+Will show C<?> if remaining time is unknown. Currently using L<Time::Duration>
+concise format, e.g. 10s, 1m40s, 16m40s, 1d4h, and so on. Format might be
+configurable and localizable in the future. Examples:
+
+ 4m10s
+ 15s
+
+=item * C<%(width)R>
+
+Estimated remaining time I<or> elapsed time, if estimated remaining time is not
+calculatable (e.g. when target is undefined). Format might be configurable and
+localizable in the future. Default width is -8. Examples:
+
+ 1m40s elapsed
+ 30s left
 
 =item * C<%(width).(prec)p>
 
-Percentage of completion. You can also specify width and precision, like C<%f>
-in Perl sprintf. Default is C<%3.0p>. If percentage is unknown (due to target
-being undef) will translate to C<?>.
+Percentage of completion. C<width> and C<precision> are optional, like C<%f> in
+Perl's C<sprintf()>, default is C<%3.0p>. If percentage is unknown (due to
+target being undef), will show C<?>.
 
-=item * C<%(width).(prec)c>
+=item * C<%(width)P>
 
-Current position (pos) (or B<c>ounter).
+Current position (pos).
 
-=item * C<%(width).(prec)C>
+=item * C<%(width)T>
 
-Target (or total item B<c>ount). If undefined, will translate to C<?>.
+Target. If undefined, will show C<?>.
 
 =item * C<%m>
 
-B<M>essage. If message is unspecified, translate to empty string.
+Message. If message is unspecified, will show empty string.
 
 =item * C<%%>
 
@@ -645,4 +692,3 @@ See examples on how Progress::Any is used by other modules: L<Perinci::CmdLine>
 (supplying progress object to functions), L<Git::Bunch> (using progress object).
 
 =cut
-

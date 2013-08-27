@@ -1,5 +1,32 @@
 Revision history for Progress-Any
 
+0.10    2013-08-24 (SHARYANTO) (not yet released)
+
+        - Rework internals and some API.
+
+        [ENHANCEMENTS]
+
+        - Allow reinitializing 'pos' and 'target' at subsequent get_indicator()
+          for the same task.
+
+        - Add task title (in addition to name).
+
+        - Allow specifying estimated remaining of a task when creating an
+          indicator, via passing 'remaining'.
+
+        - New fill templates: %r (remaining time), %R (remaining time or elapsed
+          time).
+
+        [INCOMPATIBLE CHANGES]
+
+        - *fill_template(): %a (elapsed time) becomes %e, %c (pos) becomes %P,
+           %C (target) becomes %T, %t (task name) becomes %n.
+
+        [REMOVED FEATURES]
+
+        - Remove 'status' in update().
+
+
 0.09    2013-05-18 (SHARYANTO)
 
         - Bugfix: double counting of children's targets.

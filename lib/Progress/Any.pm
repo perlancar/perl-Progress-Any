@@ -14,7 +14,7 @@ sub import {
     my $caller = caller();
     for (@args) {
         if ($_ eq '$progress') {
-            my $progress = $self->get_indicator(task => 'main');
+            my $progress = $self->get_indicator(task => '');
             {
                 no strict 'refs';
                 my $v = "$caller\::progress";
@@ -29,42 +29,39 @@ sub import {
 our %indicators; # key = task name
 our %outputs;    # key = task name, value = [$outputobj, ...]
 
-# attributes of an indicator/task:
-# - title (str*) = task's title
-# - target (float)
-# - pos (float*)
-# - finished (bool)
-# - ctime (float*) = creation time
-# - st_target (float) = sum of all subtasks' target
-# - remaining (float) = estimated remaining time
-# - pctcomp (float) = calculated, percentage of completion
-# - st_pos (float*) = sum of all subtasks' pos
-# - st_min_ctime (float) = smallest ctime from subtasks
-# - st_remaining (float) = sum of all subtasks' remaining time
-# - lutime (float) = last update time, when displaying information
-#                    remaining or elapsed need to be adjusted with (now-lutime)
+# internal attributes:
+# - _st_target (float) = sum of all subtasks' target
+# - _st_pos (float*) = sum of all subtasks' pos
+# - _st_remaining (float) = sum of all subtasks' remaining time
 
 # return 1 if created, 0 if already created/initialized
 sub _init_indicator {
-    my ($class, $task) = @_;
-    return 0 if $indicators{$task};
+    my ($class, $task, $ctime) = @_;
+
+    # prevent double initialization
+    return $indicators{$task} if $indicators{$task};
+
+    $ctime //= time();
 
     $indicators{$task} = bless({
         task      => $task,
         title     => $task,
         target    => 0,
         pos       => 0,
-        remaining => undef,
-        ctime     => time(),
+        remaining => 0,
+        ctime     => $ctime,
         finished  => 0,
+        pctcomp   => 0,
     }, $class);
 
     # if we create an indicator named a.b.c, we must also create a.b, a, and ''.
     if ($task =~ s/\.?\w+\z//) {
-        $class->_init_indicator($task);
+        # make ctime of parents the same, parents must be "born" earlier or at
+        # least at the same time as children
+        $class->_init_indicator($task, $ctime);
     }
 
-    1;
+    $indicators{$task};
 }
 
 sub get_indicator {
@@ -81,79 +78,101 @@ sub get_indicator {
     }
     die "Invalid task syntax '$task'" unless $task =~ /\A(?:\w+(\.\w+)*)?\z/;
 
-    my $target    = delete($args{target});
-    my $pos       = delete($args{pos}) // 0;
-    my $title     = delete($args{title}) // $task;
-    my $remaining = delete($args{remaining});
+    my %uargs;
+
+    my $p = $class->_init_indicator($task);
+    for my $an (qw/target pos title remaining/) {
+        if (exists $args{$an}) {
+            $uargs{$an} = delete($args{$an});
+        }
+    }
     die "Unknown argument(s) to get_indicator(): ".join(", ", keys(%args))
         if keys(%args);
-    $class->_init_indicator($task);
-    my $p = $indicators{$task};
-    $p->title($title)     if exists($oargs{title});
-    $p->remaining($title) if exists($oargs{remaining});
-    $p->target($target)   if exists($oargs{target});
-    $p->pos($pos)         if exists($oargs{pos});
+    $p->_update(%uargs) if keys %uargs;
 
     $p;
 }
 
-sub title {
-    my $self = shift;
-    if (@_) {
-        my $oldtitle = $self->{title};
-        my $title    = shift;
-        $self->{title} = $title;
-        return $self;
+my %attrs = (
+    title     => {is => 'rw'},
+    target    => {is => 'rw'},
+    pos       => {is => 'rw'},
+    remaining => {is => 'rw'},
+    finished  => {is => 'rw'},
+    pctcomp   => {is => 'ro'},
+    ctime     => {is => 'ro'},
+);
+
+# create attribute methods
+for my $an (keys %attrs) {
+    my $code;
+    if ($attrs{$an}{is} eq 'rw') {
+        $code = sub {
+            my $self = shift;
+            if (@_) {
+                $self->_update($an => shift);
+            }
+            $self->{$an};
+        };
     } else {
-        return $self->{title};
+        $code = sub {
+            my $self = shift;
+            my $self = shift;
+            die "Can't set value, $an is an ro attribute" if @_;
+            $self->{$an};
+        };
     }
+    no strict 'refs';
+    *{$an} = $code;
 }
 
-sub remaining {
-    my $self = shift;
-    if (@_) {
-        my $val = shift;
-        die "Invalid value for remaining, must be a positive number"
-            unless !defined($val) || $val >= 0;
-        $self->{remaining} = $val;
-        return $self;
-    } else {
-        return $self->{remaining};
-    }
-}
-
-sub target {
-    my $self = shift;
-    if (@_) {
-        my $val = shift;
-        die "Invalid value for target, must be a positive number"
-            unless !defined($val) || $val >= 0;
-        $self->_update(target=>$val);
-        return $self;
-    } else {
-        return $self->{target};
-    }
-}
-
-sub pos {
-    my $self = shift;
-    if (@_) {
-        my $val = shift;
-        die "Invalid value for pos, must be a positive number"
-            unless defined($val) && $val >= 0;
-        $self->_update(pos=>$val);
-        return $self;
-    } else {
-        return $self->{pos};
-    }
-}
-
-# update an indicator's target/pos, and update pctcomp/remaining as well as
-# parents' st_* attributes.
+# the routine to update rw attributes and recalculate calculated attributes
+# (including those of parents). pass it the attributes you want to change and it
+# will do validation and updating and recalculation.
 sub _update {
     my ($self, %args) = @_;
 
-    return unless exists($args{target}) || exists($args{pos});
+    # no need to check for unknown arg in %args, it's an internal method anyway
+
+    if (exists $args{title}) {
+        my $val = $args{title};
+        die "Invalid value for title, must be defined"
+            unless defined($val);
+        $self->{title} = $val;
+        goto DONE;
+    }
+
+    if (exists $args{remaining}) {
+        my $val = $args{remaining};
+        die "Invalid value for remaining, must be a positive number or undef"
+            unless !defined($val) || $val >= 0;
+    }
+
+    if (exists $args{target}) {
+        my $val = $args{target};
+        die "Invalid value for target, must be a positive number or undef"
+            unless !defined($val) || $val >= 0;
+    }
+
+    if (exists $args{pos}) {
+        my $val = $args{pos};
+        die "Invalid value for pos, must be a positive number"
+            unless defined($val) && $val >= 0;
+    }
+
+    if (exists $args{finished}) {
+        my $val = $args{finished};
+        die "Invalid value for remaining, must be defined"
+            unless defined($val);
+    }
+
+    # no changes
+    goto DONE;
+
+  DONE:
+    $mtime = time();
+    return;
+}
 
     if (exists $args{target}) {
         my $oldtarget = $self->{target};
@@ -502,70 +521,94 @@ Target can be changed in the middle of things.
 =back
 
 
+=head1 VARIABLES
+
+=head2 $mtime => NUM
+
+Unix timestamp of when update() is last called. Only a single value is needed
+for this, that's why it is put as a package variable instead of object
+attribute. When displaying remaining or elapsed time, the times are adjusted
+against this value. For example, if C<update()> is called 3 seconds ago,
+remaining time is assumed to decrease by 3 seconds and elapsed time to increase
+by 3 seconds.
+
+
 =head1 EXPORTS
 
-=head2 $progress
+=head2 $progress => OBJ
 
-The main indicator. Equivalent to:
+The root indicator. Equivalent to:
 
- Progress::Any->get_indicator(task => 'main')
+ Progress::Any->get_indicator(task => '')
+
+
+=head1 ATTRIBUTES
+
+Below are the attributes of an indicator/task:
+
+=head2 task => STR* (default: from caller's package, or C<main>)
+
+Task name. If not specified will be set to caller's package (C<::> will be
+replaced with C<.>), e.g. if you are calling this method from C<main::foo()>,
+then task will be set to C<main>. If caller is code inside eval, C<main> will be
+used instead.
+
+=head2 title => STR* (default: task name)
+
+Specify task title. Task title is a longer description for a task and can
+contain spaces and other characters. It is displayed in some outputs. For
+example, for a task called C<copy>, its title might be C<Copying files to remote
+server>.
+
+=head2 target => POSNUM (default: 0)
+
+The total number of items to finish. Can be set to undef to mean that we don't
+know how many items there are to finish (in which case, C<remaining> and
+C<pctcomp> will also be set to undef to reflect this fact).
+
+=head2 pos => POSNUM* (default: 0)
+
+The number of items that are already done. It cannot be larger than C<target>,
+if C<target> is defined. If C<target> is set to a value smaller than C<pos> or
+C<pos> is set to a value larger than C<target>, C<pos> will be changed to be
+C<target>.
+
+=head2 remaining => POSNUM (default: 0)
+
+Estimated remaining time until the task is finished, in seconds. You can set
+this value, for example at the beginning to give users an approximation, even
+though you don't set C<target>. However, whenever C<pos> or C<target> is
+set/changed, this attribute will be recalculated.
+
+=head2 pctcomp => NUM (default: 0)
+
+Percentage of completion, a number between 0 and 100. This is a read-only
+attribute and (re)calculated whenever there's a change in C<target> or C<pos> or
+C<finished>: if C<target> is undef, C<pctcomp> will be undef, if C<target> is 0,
+C<pctcomp> is set to 0 if C<finished> is false, or 100 if C<finished> is true.
+
+=head2 ctime => NUM
+
+A read-only attribute, Unix timestamp when the indicator is created. Recorded to
+get elapsed time.
+
+=head2 finished => BOOL
+
+Indicate that the task has been finished. Initially set to false, can be set to
+true but not back to false.
 
 
 =head1 METHODS
 
 =head2 Progress::Any->get_indicator(%args) => OBJ
 
-Get a progress indicator for a certain task.
+Get a progress indicator for a certain task. C<%args> contain attribute values,
+at least C<task> must be specified.
 
-Arguments:
+Note that this module maintains a list of indicator singleton objects for each
+task (in C<%indicators> package variable), so subsequent C<get_indicator()> for
+the same task will return the same object.
 
-=over 4
-
-=item * task => STR (default: main)
-
-Required. Specify task name. If not specified will be set to caller's package
-(C<::> will be replaced with C<.>), e.g. if you are calling this method from
-C<main::foo()>, then task will be set to C<main>. If caller is code inside eval,
-C<main> will be used instead.
-
-=item * title => STR (default is task name)
-
-Optional. Specify task title. Task title is a longer description for a task and
-can contain spaces and other characters. For example, for a task called C<copy>,
-its title might be C<Copying files to remote server>.
-
-=item * remaining => NUM (default: undef)
-
-Optional. Can be used to give estimation for remaining time, in seconds.
-
-=item * target => NUM (default: undef)
-
-Optional. Can be used to initialize target.
-
-=item * pos => NUM (default: 0)
-
-Optional. Can be used to initialize starting position.
-
-=back
-
-=head2 $progress->target([ NUM ]) => NUM
-
-Get or (re)set target. Can be left or set to undef.
-
-=head2 $progress->pos([ NUM ]) => NUM
-
-Get or set the current position. Number must be defined and greater than or
-equal to zero.
-
-=head2 $progress->title([ STR ]) => STR
-
-Get or set the task title.
-
-=head2 $progress->remaining([ NUM ]) => NUM
-
-Get or set estimated remaining time, in seconds. Number must be defined and
-greater than or equal to zero. Note that estimated remaining time will be
-recalculated everytime C<pos> or C<target> is updated.
 
 =head2 $progress->update(%args)
 
@@ -680,6 +723,12 @@ A literal C<%> sign.
 
 =back
 
+
+=head1 FAQ
+
+=head2 Why don't you use Moo?
+
+Perhaps. For now I'm trying to be minimal and
 
 =head1 SEE ALSO
 

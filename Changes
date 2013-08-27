@@ -6,8 +6,9 @@ Revision history for Progress-Any
 
         [ENHANCEMENTS]
 
-        - Allow reinitializing 'pos' and 'target' at subsequent get_indicator()
-          for the same task.
+        - Allow reinitializing 'pos' and 'target' (and all other rw attributes)
+          at subsequent get_indicator() for the same task. This is to make
+          program more predictable, instead of silently ignoring parameters.
 
         - Add task title (in addition to name).
 
@@ -19,12 +20,17 @@ Revision history for Progress-Any
 
         [INCOMPATIBLE CHANGES]
 
-        - *fill_template(): %a (elapsed time) becomes %e, %c (pos) becomes %P,
-           %C (target) becomes %T, %t (task name) becomes %n.
+        - The $progress export is now set to the root ('') indicator instead of
+          'main', so it includes all indicators.
+
+        - fill_template(): re-rationalize template names: %a (elapsed time)
+          becomes %e, %c (pos) becomes %P, %C (target) becomes %T, %t (task
+          name) becomes %n.
 
         [REMOVED FEATURES]
 
-        - Remove 'status' in update().
+        - Remove 'status' in update() because it is unneeded (concerning outputs
+          can use 'message' instead).
 
 
 0.09    2013-05-18 (SHARYANTO)

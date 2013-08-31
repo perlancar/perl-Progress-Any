@@ -29,6 +29,9 @@ Revision history for Progress-Any
 
         [REMOVED FEATURES]
 
+        - Remove total_target() (ambiguous name). Currently to get this, use
+          fill_template('%T').
+
         - Remove 'status' in update() because it is unneeded (concerning outputs
           can use 'message' instead).
 

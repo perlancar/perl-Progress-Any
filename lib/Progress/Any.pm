@@ -26,6 +26,7 @@ sub import {
     }
 }
 
+our $mtime;
 our %indicators; # key = task name
 our %outputs;    # key = task name, value = [$outputobj, ...]
 
@@ -43,7 +44,7 @@ sub _init_indicator {
 
     $ctime //= time();
 
-    $indicators{$task} = bless({
+    my $progress = bless({
         task       => $task,
         title      => $task,
         target     => 0,
@@ -53,11 +54,12 @@ sub _init_indicator {
         finished   => 0,
         pctcomp    => 0,
 
-        _st_pos    => 0,
-        _st_target => 0,
-        _st_
+        _st_target    => 0,
+        _st_pos       => 0,
+        _st_remaining => 0,
     }, $class);
-    $self->_update(-calc_calculated=>1);
+    $progress->_update(-calc_calculated=>1);
+    $indicators{$task} = $progress;
 
     # if we create an indicator named a.b.c, we must also create a.b, a, and ''.
     if ($task =~ s/\.?\w+\z//) {
@@ -66,7 +68,7 @@ sub _init_indicator {
         $class->_init_indicator($task, $ctime);
     }
 
-    $indicators{$task};
+    $progress;
 }
 
 sub get_indicator {
@@ -82,7 +84,8 @@ sub get_indicator {
         $task =~ s/::/./g;
         $task =~ s/[^.\w]+/_/g;
     }
-    die "Invalid task syntax '$task'" unless $task =~ /\A(?:\w+(\.\w+)*)?\z/;
+    die "Invalid task syntax '$task', please only use dotted words"
+        unless $task =~ /\A(?:\w+(\.\w+)*)?\z/;
 
     my %uargs;
 
@@ -136,6 +139,8 @@ for my $an (keys %attrs) {
 # will do validation and updating and recalculation.
 sub _update {
     my ($self, %args) = @_;
+
+    use Data::Dump; dd \%args;
 
     # no need to check for unknown arg in %args, it's an internal method anyway
 
@@ -192,52 +197,6 @@ sub _update {
   DONE:
     $mtime = time();
     return;
-}
-
-    if (exists $args{target}) {
-        my $oldtarget = $self->{target};
-        my $target    = $args{target};
-        $self->{target} = $target;
-
-        # update parents
-        my $partask = $self->{task};
-        while (1) {
-            $partask =~ s/\.?\w+\z// or last;
-            if (defined $target) {
-                if (defined $oldtarget) {
-                    $indicators{$partask}{ctarget} += $target-$oldtarget;
-                } else {
-                    # target becomes defined from undef, we need to recalculate
-                    $indicators{$partask}{ctarget} = 0;
-                  RECOUNT:
-                    for (keys %indicators) {
-                        my $prefix = length($partask) ? "$partask." : "";
-                        next unless /\Q$prefix\E\w+/;
-                        if (!defined($indicators{$_}{target})) {
-                            $indicators{$partask}{ctarget} = undef;
-                            last RECOUNT;
-                        } else {
-                            $indicators{$partask}{ctarget} +=
-                                $indicators{$_}{target};
-                        }
-                    }
-                }
-            } else {
-                # target is changed to undef
-                $indicators{$partask}{target_} = undef;
-            }
-        }
-
-    }
-
-    if (exists $args{pos}) {
-        my $oldpos = $self->{pos};
-        my $pos    = $args{pos};
-        $pos = $self->{target} if
-            defined($self->{target}) && $pos > $self->{target};
-
-        # update parents
-    }
 }
 
 sub update {
@@ -671,7 +630,7 @@ Equivalent to:
      %args,
  );
 
-=head2 $progress->fill_template($template, \%values)
+=head2 $progress->fill_template($template)
 
 Fill template with values, like in C<sprintf()>. Usually used by output modules.
 Available templates:

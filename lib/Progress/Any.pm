@@ -44,15 +44,20 @@ sub _init_indicator {
     $ctime //= time();
 
     $indicators{$task} = bless({
-        task      => $task,
-        title     => $task,
-        target    => 0,
-        pos       => 0,
-        remaining => 0,
-        ctime     => $ctime,
-        finished  => 0,
-        pctcomp   => 0,
+        task       => $task,
+        title      => $task,
+        target     => 0,
+        pos        => 0,
+        remaining  => 0,
+        ctime      => $ctime,
+        finished   => 0,
+        pctcomp    => 0,
+
+        _st_pos    => 0,
+        _st_target => 0,
+        _st_
     }, $class);
+    $self->_update(-calc_calculated=>1);
 
     # if we create an indicator named a.b.c, we must also create a.b, a, and ''.
     if ($task =~ s/\.?\w+\z//) {
@@ -75,6 +80,7 @@ sub get_indicator {
         #say "D:caller=".join(",",map{$_//""} @caller);
         $task = $caller[0] eq '(eval)' ? 'main' : $caller[0];
         $task =~ s/::/./g;
+        $task =~ s/[^.\w]+/_/g;
     }
     die "Invalid task syntax '$task'" unless $task =~ /\A(?:\w+(\.\w+)*)?\z/;
 
@@ -117,7 +123,6 @@ for my $an (keys %attrs) {
     } else {
         $code = sub {
             my $self = shift;
-            my $self = shift;
             die "Can't set value, $an is an ro attribute" if @_;
             $self->{$an};
         };
@@ -134,12 +139,31 @@ sub _update {
 
     # no need to check for unknown arg in %args, it's an internal method anyway
 
-    if (exists $args{title}) {
+    my $t = $self->{task};
+    my %calc; # to flag certain recalculations
+
+    {
+        last unless exists $args{title};
         my $val = $args{title};
         die "Invalid value for title, must be defined"
             unless defined($val);
         $self->{title} = $val;
-        goto DONE;
+    }
+
+    {
+        last unless exists $args{pos};
+        my $val = $args{pos};
+        die "Invalid value for pos, must be a positive number"
+            unless defined($val) && $val >= 0;
+        last if $val == $self->{pos};
+
+    }
+
+    if ($args{-calc_calculated} || $calc{calc_st_pos}) {
+        for (keys %indicators) {
+            next unless index($_, "$t.") == 0;
+
+        }
     }
 
     if (exists $args{remaining}) {
@@ -154,12 +178,6 @@ sub _update {
             unless !defined($val) || $val >= 0;
     }
 
-    if (exists $args{pos}) {
-        my $val = $args{pos};
-        die "Invalid value for pos, must be a positive number"
-            unless defined($val) && $val >= 0;
-    }
-
     if (exists $args{finished}) {
         my $val = $args{finished};
         die "Invalid value for remaining, must be defined"
@@ -168,6 +186,8 @@ sub _update {
 
     # no changes
     goto DONE;
+
+    # update pos
 
   DONE:
     $mtime = time();
@@ -403,14 +423,14 @@ In your module:
  sub download {
      my @urls = @_;
      return unless @urls;
-     my $progress = Progress::Any->get_indicator(task => "download");
-     $progress->pos(0);
-     $progress->target(~~@urls);
+     my $progress = Progress::Any->get_indicator(
+         task => "download", pos=>0, finished=>0, target=>~~@urls);
      for my $url (@urls) {
          # download the $url ...
+         # update() by default increases pos by 1
          $progress->update(message => "Downloaded $url");
      }
-     $progress->finish;
+     $progress->finished(1);
  }
 
 In your application:
@@ -436,12 +456,12 @@ Another example, demonstrating multiple indicators and the LogAny output:
  use Progress::Any::Output;
  use Log::Any::App;
 
- Progress::Any::Output->set('LogAny', format => '[%c/%C] %m');
+ Progress::Any::Output->set('LogAny', format => '[%t] [%P/%T] %m');
  my $p1 = Progress::Any->get_indicator(task => 'main.download');
  my $p2 = Progress::Any->get_indicator(task => 'main.copy');
 
  $p1->target(10);
- $p1->update(message => "downloading A"); # by default increase pos by 1
+ $p1->update(message => "downloading A");
  $p2->update(message => "copying A");
  $p1->update(message => "downloading B");
  $p2->update(message => "copying B");
@@ -645,10 +665,11 @@ Can be set to 1 (e.g. by finish()) if task is completed.
 
 Equivalent to:
 
- $progress->update(pos => $progress->target, finished=>1, %args);
-
-The C<< finished => 1 >> part currently does nothing particularly special,
-except to record completion.
+ $progress->update(
+     ( pos => $progress->target ) x !!defined($progress->target),
+     finished => 1,
+     %args,
+ );
 
 =head2 $progress->fill_template($template, \%values)
 
@@ -728,7 +749,8 @@ A literal C<%> sign.
 
 =head2 Why don't you use Moo?
 
-Perhaps. For now I'm trying to be minimal and
+Perhaps. For now I'm trying to be minimal and as dependency-free as possible.
+
 
 =head1 SEE ALSO
 

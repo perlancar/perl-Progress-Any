@@ -63,7 +63,7 @@ Revision history for Progress-Any
 
 0.05    2013-05-18 (SHARYANTO)
 
-        Happy birthday, bro!
+        - Happy birthday, bro!
 
         [INCOMPATIBLE CHANGES]
 
@@ -87,20 +87,20 @@ Revision history for Progress-Any
 
 0.04    2013-01-10 (SHARYANTO)
 
-        No functional changes. More POD tweaks/fixes.
+        - No functional changes. More POD tweaks/fixes.
 
 
 0.03    2013-01-10 (SHARYANTO)
 
-        No functional changes. Update/fix Synopsis.
+        - No functional changes. Update/fix Synopsis.
 
 
 0.02    2012-10-24 (SHARYANTO)
 
-        Some tweaks/fixes: don't pre-init $progress, give default message to
-        reset() and finish().
+        - Some tweaks/fixes: don't pre-init $progress, give default message to
+          reset() and finish().
 
 
 0.01    2012-10-24 (SHARYANTO)
 
-        First, early release.
+        - First, early release.

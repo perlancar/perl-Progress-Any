@@ -2,7 +2,7 @@ Revision history for Progress-Any
 
 0.10    2013-08-24 (SHARYANTO) (not yet released)
 
-        - Rework internals and some API.
+        - Rework internals and some API. This is the second API revision.
 
         [ENHANCEMENTS]
 
@@ -10,7 +10,9 @@ Revision history for Progress-Any
           at subsequent get_indicator() for the same task. This is to make
           program more predictable, instead of silently ignoring parameters.
 
-        - Add task title (in addition to name).
+        - Allow indicator to be start()'ed and stop()'ed at any time.
+
+        - Add task title (in addition to its name).
 
         - Allow specifying estimated remaining of a task when creating an
           indicator, via passing 'remaining'.

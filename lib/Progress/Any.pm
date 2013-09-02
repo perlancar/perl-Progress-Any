@@ -26,7 +26,6 @@ sub import {
     }
 }
 
-our $mtime;
 our %indicators; # key = task name
 our %outputs;    # key = task name, value = [$outputobj, ...]
 
@@ -51,7 +50,7 @@ sub _init_indicator {
         pos        => 0,
         remaining  => 0,
         ctime      => $ctime,
-        finished   => 0,
+        state      => 'stopped',
         pctcomp    => 0,
 
         _st_target    => 0,
@@ -90,7 +89,7 @@ sub get_indicator {
     my %uargs;
 
     my $p = $class->_init_indicator($task);
-    for my $an (qw/target pos title remaining/) {
+    for my $an (qw/title target pos remaining state/) {
         if (exists $args{$an}) {
             $uargs{$an} = delete($args{$an});
         }
@@ -107,7 +106,7 @@ my %attrs = (
     target    => {is => 'rw'},
     pos       => {is => 'rw'},
     remaining => {is => 'rw'},
-    finished  => {is => 'rw'},
+    state     => {is => 'rw'},
     pctcomp   => {is => 'ro'},
     ctime     => {is => 'ro'},
 );
@@ -183,10 +182,10 @@ sub _update {
             unless !defined($val) || $val >= 0;
     }
 
-    if (exists $args{finished}) {
-        my $val = $args{finished};
-        die "Invalid value for remaining, must be defined"
-            unless defined($val);
+    if (exists $args{state}) {
+        my $val = $args{state};
+        die "Invalid value for state, must either be paused/running/finished"
+            unless defined($val) && $val =~ /\A(?:paused|running|finished)\z/;
     }
 
     # no changes
@@ -207,14 +206,14 @@ sub update {
 
     my $message  = delete($args{message});
     my $level    = delete($args{level});
-    my $finished = delete($args{finished});
+    my $state    = delete($args{state});
     die "Unknown argument(s) to update(): ".join(", ", keys(%args))
         if keys(%args);
 
     my $now = time();
 
-    $self->{finished} = $finished;
-    $self->{lutime}   = $now;
+    $self->{state}  = $state;
+    $self->{lutime} = $now;
 
     # find output(s) and call it
     {
@@ -237,9 +236,13 @@ sub update {
 
 sub finish {
     my ($self, %args) = @_;
-    $self->update(pos=>$self->{target}, finished=>1, %args);
+    $self->update(pos=>$self->{target}, state=>'finished', %args);
 }
 
+# - currently used letters: emnPpRrTt%
+# - currently used by Output::TermProgressBarColor: bB
+# - letters that can be used later: c (ctime?), s (last start time?), S (last
+#   stop time? state?)
 sub fill_template {
     my ($self, $template, %args) = @_;
 
@@ -383,13 +386,13 @@ In your module:
      my @urls = @_;
      return unless @urls;
      my $progress = Progress::Any->get_indicator(
-         task => "download", pos=>0, finished=>0, target=>~~@urls);
+         task => "download", pos=>0, target=>~~@urls);
      for my $url (@urls) {
          # download the $url ...
          # update() by default increases pos by 1
          $progress->update(message => "Downloaded $url");
      }
-     $progress->finished(1);
+     $progress->finish;
  }
 
 In your application:
@@ -528,21 +531,21 @@ Below are the attributes of an indicator/task:
 =head2 task => STR* (default: from caller's package, or C<main>)
 
 Task name. If not specified will be set to caller's package (C<::> will be
-replaced with C<.>), e.g. if you are calling this method from C<main::foo()>,
-then task will be set to C<main>. If caller is code inside eval, C<main> will be
-used instead.
+replaced with C<.>), e.g. if you are calling this method from
+C<Foo::Bar::baz()>, then task will be set to C<Foo.Bar>. If caller is code
+inside eval, C<main> will be used instead.
 
 =head2 title => STR* (default: task name)
 
 Specify task title. Task title is a longer description for a task and can
-contain spaces and other characters. It is displayed in some outputs. For
-example, for a task called C<copy>, its title might be C<Copying files to remote
-server>.
+contain spaces and other characters. It is displayed in some outputs, as well as
+using C<%t> in C<fill_template()>. For example, for a task called C<copy>, its
+title might be C<Copying files to remote server>.
 
 =head2 target => POSNUM (default: 0)
 
 The total number of items to finish. Can be set to undef to mean that we don't
-know how many items there are to finish (in which case, C<remaining> and
+know (yet) how many items there are to finish (in which case, C<remaining> and
 C<pctcomp> will also be set to undef to reflect this fact).
 
 =head2 pos => POSNUM* (default: 0)
@@ -551,6 +554,17 @@ The number of items that are already done. It cannot be larger than C<target>,
 if C<target> is defined. If C<target> is set to a value smaller than C<pos> or
 C<pos> is set to a value larger than C<target>, C<pos> will be changed to be
 C<target>.
+
+=head2 state => STR (default: C<paused>)
+
+State of task/indicator. Either: C<paused>, C<running>, or C<finished>.
+Initially it will be set to C<paused>, which means elapsed time won't be running
+and will stay at 0. C<update()> will set the state to C<running> to get elapsed
+time to run. At the end of task, you can call C<finish()> (or alternatively set
+C<state> to C<finished>) to stop the elapsed time again.
+
+The difference between C<paused> and C<finished> is: when target and pos are
+both at 0, C<pctcomp> will be set to 0 on C<paused>, and 100 on C<finished>.
 
 =head2 remaining => POSNUM (default: 0)
 
@@ -568,13 +582,8 @@ C<pctcomp> is set to 0 if C<finished> is false, or 100 if C<finished> is true.
 
 =head2 ctime => NUM
 
-A read-only attribute, Unix timestamp when the indicator is created. Recorded to
-get elapsed time.
-
-=head2 finished => BOOL
-
-Indicate that the task has been finished. Initially set to false, can be set to
-true but not back to false.
+A read-only attribute, Unix timestamp when the indicator is created. Currently
+unused except for displaying %c.
 
 
 =head1 METHODS
@@ -614,9 +623,9 @@ of this update. Default is C<normal> (or C<low> for fractional update), but can
 be set to C<high> or C<low>. Output can choose to ignore updates lower than a
 certain level.
 
-=item * finished => BOOL
+=item * state => STR
 
-Can be set to 1 (e.g. by finish()) if task is completed.
+Can be set to C<finished> to finish a task.
 
 =back
 
@@ -626,7 +635,7 @@ Equivalent to:
 
  $progress->update(
      ( pos => $progress->target ) x !!defined($progress->target),
-     finished => 1,
+     state => 'finished',
      %args,
  );
 
@@ -637,38 +646,36 @@ Available templates:
 
 =over
 
+=item * C<%(width)n>
+
+Task name (the value of the C<task> attribute). C<width> is optional, an
+integer, like in C<sprintf()>, can be negative to mean left-justify instead of
+right.
+
 =item * C<%(width)t>
 
-Task name. C<width> is optional, an integer, like in C<sprintf()>, can be
-negative to mean left-justify instead of right.
+Task title (the value of the C<title> attribute).
 
 =item * C<%(width)e>
 
-Elapsed time. Currently using L<Time::Duration> concise format, e.g. 10s, 1m40s,
-16m40s, 1d4h, and so on. Format might be configurable and localizable in the
-future. Default width is -8. Examples:
+Elapsed time (current time minus C<last_start_time> if the task is started, or
+C<last_stop_time> minus C<last_start_time> if task is stopped, or 0 if task has
+never been started). Currently using L<Time::Duration> concise format, e.g. 10s,
+1m40s, 16m40s, 1d4h, and so on. Format might be configurable and localizable in
+the future. Default width is -8. Examples:
 
  2m30s
  10s
 
 =item * C<%(width)r>
 
-Estimated remaining time. Currently using L<Time::Duration> concise format, e.g.
-10s, 1m40s, 16m40s, 1d4h, and so on. Will show C<?> if unknown. Format might be
-configurable and localizable in the future. Default width is -8. Examples:
+Estimated remaining time (the value of the C<remaining> attribute). Currently
+using L<Time::Duration> concise format, e.g. 10s, 1m40s, 16m40s, 1d4h, and so
+on. Will show C<?> if unknown. Format might be configurable and localizable in
+the future. Default width is -8. Examples:
 
  1m40s
  5s
-
-=item * C<%(width)d>
-
-Estimated total duration of task (which equals to elapsed + remaining time).
-Will show C<?> if remaining time is unknown. Currently using L<Time::Duration>
-concise format, e.g. 10s, 1m40s, 16m40s, 1d4h, and so on. Format might be
-configurable and localizable in the future. Examples:
-
- 4m10s
- 15s
 
 =item * C<%(width)R>
 
@@ -676,26 +683,27 @@ Estimated remaining time I<or> elapsed time, if estimated remaining time is not
 calculatable (e.g. when target is undefined). Format might be configurable and
 localizable in the future. Default width is -8. Examples:
 
- 1m40s elapsed
  30s left
+ 1m40s elapsed
 
 =item * C<%(width).(prec)p>
 
-Percentage of completion. C<width> and C<precision> are optional, like C<%f> in
-Perl's C<sprintf()>, default is C<%3.0p>. If percentage is unknown (due to
-target being undef), will show C<?>.
+Percentage of completion (the value of the C<pctcomp> attribute). C<width> and
+C<precision> are optional, like C<%f> in Perl's C<sprintf()>, default is
+C<%3.0p>. If percentage is unknown (due to target being undef), will show C<?>.
 
 =item * C<%(width)P>
 
-Current position (pos).
+Current position (the value of the C<pos> attribute).
 
 =item * C<%(width)T>
 
-Target. If undefined, will show C<?>.
+Target (the value of the C<target> attribute). If undefined, will show C<?>.
 
 =item * C<%m>
 
-Message. If message is unspecified, will show empty string.
+Message (the C<update()> parameter). If message is unspecified, will show empty
+string.
 
 =item * C<%%>
 

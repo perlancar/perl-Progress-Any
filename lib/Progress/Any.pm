@@ -28,52 +28,43 @@ sub import {
 
 our %indicators; # key = task name
 our %outputs;    # key = task name, value = [$outputobj, ...]
-our $mtime;
 
 # internal attributes:
-# - _st_target (float) = sum of all subtasks' target
-# - _st_pos (float*) = sum of all subtasks' pos
-# - _elapsed (float*)
-# - _remaining (float)
-# - _st_remaining (float) = sum of all subtasks' remaining
+# - _elapsed (float*) = accumulated elapsed time so far
+# - _start_time (float) = when is the last time the indicator state is changed
+#     from 'stopped' to 'started'. when indicator is changed from 'started' to
+#     'stopped', this will be set to undef.
+# - _remaining = used to store user's estimation of remaining time. will be
+#     unset after each update().
 
 # return 1 if created, 0 if already created/initialized
 sub _init_indicator {
-    my ($class, $task, $ctime) = @_;
+    my ($class, $task) = @_;
 
     #say "D: _init_indicator($task)";
 
     # prevent double initialization
     return $indicators{$task} if $indicators{$task};
 
-    $ctime //= time();
-
     my $progress = bless({
-        task       => $task,
-        title      => $task,
-        target     => 0,
-        pos        => 0,
-        ctime      => $ctime,
-        state      => 'stopped',
-        pctcomp    => 0,
+        task        => $task,
+        title       => $task,
+        target      => 0,
+        pos         => 0,
+        state       => 'stopped',
 
-        _elapsed      => 0,
-        _remaining    => 0,
-        _st_target    => 0,
-        _st_pos       => 0,
-        _st_remaining => 0,
+        _remaining          => undef,
+        _set_remaining_time => undef,
+        _elapsed            => 0,
+        _start_time         => 0,
     }, $class);
     $indicators{$task} = $progress;
 
     # if we create an indicator named a.b.c, we must also create a.b, a, and ''.
     if ($task =~ s/\.?\w+\z//) {
-        #say "D: task -> $task";
-        # make ctime of parents the same, parents must be "born" earlier or at
-        # least at the same time as children
-        $class->_init_indicator($task, $ctime);
+        $class->_init_indicator($task);
     }
 
-    $progress->_update(-calc_all=>1);
     $progress;
 }
 
@@ -112,11 +103,7 @@ my %attrs = (
     title     => {is => 'rw'},
     target    => {is => 'rw'},
     pos       => {is => 'rw'},
-    remaining => {is => 'rw', manual=>1}, # calc
     state     => {is => 'rw'},
-    pctcomp   => {is => 'ro'}, # calc
-    ctime     => {is => 'ro'},
-    elapsed   => {is => 'ro', manual=>1}, # calc
 );
 
 # create attribute methods
@@ -146,76 +133,123 @@ sub elapsed {
     my $self = shift;
 
     if ($self->{state} eq 'started') {
-        return $self->{_elapsed} + (time()-$mtime);
+        return $self->{_elapsed} + (time()-$self->{_start_time});
     } else {
         return $self->{_elapsed};
+    }
+}
+
+sub total_pos {
+    my $self = shift;
+
+    my $t = $self->{task};
+
+    my $res = $self->{pos};
+    for (keys %indicators) {
+        if ($t eq '') {
+            next if $_ eq '';
+        } else {
+            next unless index($_, "$t.") == 0;
+        }
+        $res += $indicators{$_}{pos};
+    }
+    $res;
+}
+
+sub total_target {
+    my $self = shift;
+
+    my $t = $self->{task};
+
+    my $res = $self->{target};
+    return undef unless defined($res);
+
+    for (keys %indicators) {
+        if ($t eq '') {
+            next if $_ eq '';
+        } else {
+            next unless index($_, "$t.") == 0;
+        }
+        return undef unless defined $indicators{$_}{target};
+        $res += $indicators{$_}{target};
+    }
+    $res;
+}
+
+sub percent_complete {
+    my $self = shift;
+
+    my $total_pos    = $self->total_pos;
+    my $total_target = $self->total_target;
+
+    return undef unless defined($total_target);
+    if ($total_target == 0) {
+        if ($self->{state} eq 'finished') {
+            return 100;
+        } else {
+            return 0;
+        }
+    } else {
+        return $total_pos / $total_target * 100;
     }
 }
 
 sub remaining {
     my $self = shift;
 
-    if (@_) {
-        $self->_update(remaining => shift);
-        return $self;
-    }
-
-    my $r = $self->{_remaining};
-    return undef unless defined($r);
-
-    if ($self->{state} eq 'started') {
-        my $res = $r + ($mtime - time());
-        return $res > 0 ? $res : 0;
+    if (defined $self->{_remaining}) {
+        if ($self->{state} eq 'started') {
+            my $r = $self->{_remaining}-(time()-$self->{_set_remaining_time});
+            return $r > 0 ? $r : 0;
+        } else {
+            return $self->{_remaining};
+        }
     } else {
-        return $r;
+        if (defined $self->{target}) {
+            if ($self->{pos} == 0) {
+                return 0;
+            } else {
+                return ($self->{target} - $self->{pos})/$self->{pos} *
+                    $self->elapsed;
+            }
+        } else {
+            return undef;
+        }
     }
 }
 
-sub remaining_inclusive {
+sub total_remaining {
     my $self = shift;
 
-    my $r = $self->remaining;
-    my $str = $self->{_st_remaining};
-    return undef unless defined($r) && defined($str);
-    $r + $str;
+    my $t = $self->{task};
+
+    my $res = $self->remaining;
+    return undef unless defined $res;
+
+    for (keys %indicators) {
+        if ($t eq '') {
+            next if $_ eq '';
+        } else {
+            next unless index($_, "$t.") == 0;
+        }
+        my $res2 = $indicators{$_}->remaining;
+        return undef unless defined $res2;
+        $res += $res2;
+    }
+    $res;
 }
 
-sub target_inclusive {
-    my $self = shift;
-
-    my $t = $self->{target};
-    my $stt = $self->{_st_target};
-    return undef unless defined($t) && defined($stt);
-    $t + $stt;
-}
-
-sub pos_inclusive {
-    my $self = shift;
-
-    $self->{pos} + $self->{_st_pos};
-}
-
-# the routine to update rw attributes and recalculate calculated attributes
-# (including those of parents). pass it the attributes you want to change and it
-# will do validation and updating and recalculation.
+# the routine to use to update rw attributes, does validation and checks to make
+# sure things are consistent.
 sub _update {
     my ($self, %args) = @_;
 
     # no need to check for unknown arg in %args, it's an internal method anyway
 
-    my $task = $self->{task};
-    use Data::Dump; print "D: _update($task) "; dd \%args;
-    my %flags;
+    my $now = time();
 
-    my @parents;
-    {
-        my $t = $task;
-        while (1) {
-            last unless $t =~ s/\.\w+\z//;
-            push @parents, $t;
-        }
-        push @parents, '';
-    }
+    my $task = $self->{task};
+    #use Data::Dump; print "D: _update($task) "; dd \%args;
 
   SET_TITLE:
     {
@@ -226,184 +260,86 @@ sub _update {
         $self->{title} = $val;
     }
 
-  SET_POS:
-    my $old_pos = $self->{pos};
-    {
-        last unless exists $args{pos};
-        my $val = $args{pos};
-        die "Invalid value for pos, must be a positive number"
-            unless defined($val) && $val >= 0;
-        last if $val == $old_pos;
-
-        # ensure that pos does not exceed target
-        if (defined($self->{target}) && $val > $self->{target}) {
-            $val = $self->{target};
-        }
-
-        $flags{adjust_parents_st_pos}++;
-        $flags{adjust_parents_st_remaining}++;
-        $flags{calc_pctcomp_and_remaining_for}{$task} = 1;
-        $self->{pos} = $val;
-    }
-
   SET_TARGET:
-    my $old_target = $self->{target};
     {
         last unless exists $args{target};
         my $val = $args{target};
         die "Invalid value for target, must be a positive number or undef"
             unless !defined($val) || $val >= 0;
-        if (defined($val) && defined($old_target)) {
-            # stay defined
-            last if $val == $old_target;
-
-            # ensure that pos does not exceed target
-            if ($self->{pos} > $val) {
-                $self->{pos} = $val;
-                $flags{adjust_parents_st_pos}++;
-                $flags{adjust_parents_st_remaining}++;
-            }
-
-            $flags{adjust_parents_st_target}++;
-            $flags{calc_pctcomp_and_remaining_for}{$task} = 1;
-            $flags{calc_pctcomp_and_remaining_for}{$_} = 1 for @parents;
-        } elsif (!defined($val) && defined($old_target)) {
-            # from defined becomes undef
-            undef $self->{pctcomp};
-            undef $self->{_remaining};
-            for (@parents) {
-                undef $indicators{$_}{pctcomp};
-                undef $indicators{$_}{_remaining};
-                undef $indicators{$_}{_st_target};
-                undef $indicators{$_}{_st_remaining};
-            }
-        } elsif (defined($val) && !defined($old_target)) {
-            # from undef becomes defined
-
-            # ensure that pos does not exceed target
-            if ($self->{pos} > $val) {
-                $self->{pos} = $val;
-                $flags{adjust_parents_st_pos}++;
-                $flags{adjust_parents_st_remaining}++;
-            }
-
-            for (@parents) {
-                $flags{calc_st_target_for}{$_} = 1;
-                $flags{calc_pctcomp_and_remaining_for}{$_} = 1;
-            }
-        } else {
-            # stay undefined, do nothing
-            last;
+        # ensure that pos does not exceed target
+        if (defined($val) && $self->{pos} > $val) {
+            $self->{pos} = $val;
         }
         $self->{target} = $val;
+        undef $self->{_remaining};
     }
 
-  ADJUST_PARENTS_ST_POS:
+  SET_POS:
     {
-        last unless $args{-calc_all} || $flags{adjust_parents_st_pos};
-        my $diff = $self->{pos} - $old_pos;
-        for (@parents) {
-            $indicators{$_}{_st_pos} += $diff;
-            $flags{calc_pctcomp_and_remaining_for}{$_} = 1;
+        last unless exists $args{pos};
+        my $val = $args{pos};
+        die "Invalid value for pos, must be a positive number"
+            unless defined($val) && $val >= 0;
+        # ensure that pos does not exceed target
+        if (defined($self->{target}) && $val > $self->{target}) {
+            $val = $self->{target};
         }
-    }
-
-  ADJUST_PARENTS_ST_TARGET:
-    {
-        last unless $args{-calc_all} || $flags{adjust_parents_st_target};
-        my $diff = $self->{target} - $old_target;
-        for (@parents) {
-            last unless defined $indicators{$_}{_st_target};
-            $indicators{$_}{_st_target} += $diff;
-            $flags{calc_pctcomp_and_remaining_for}{$_} = 1;
-        }
-    }
-
-  CALC_PCTCOMP_AND_REMAINING_FOR:
-    {
-        for my $t (sort {length($b) <=> length($a)} # children before parent
-                       keys %{$flags{calc_pctcomp_and_remaining_for}}) {
-            #say "D: calc pctcomp for $t";
-            my $p = $indicators{$t};
-            my $tot_pos = $p->pos_inclusive;
-            my $tot_target = $p->target_inclusive;
-            if (!defined($tot_target)) {
-                $p->{pctcomp} = undef;
-            } elsif ($tot_target == 0) {
-                $p->{pctcomp}    = $p->{state} eq 'finished' ? 100 : 0;
-                $p->{_remaining} = 0 if $p->{state} eq 'finished';
-            } else {
-                $p->{pctcomp}    = $tot_pos / $tot_target * 100;
-                if ($self->{pos} && defined($self->{target})) {
-                    my $e = $p->elapsed;
-                    $p->{_remaining} =
-                        ($self->{target}-$self->{pos}) / $self->{pos} * $e;
-                }
-            }
-        }
+        $self->{pos} = $val;
+        undef $self->{_remaining};
     }
 
   SET_REMAINING:
-    my $old_remaining = $self->{_remaining};
     {
-        last unless exists $args{_remaining};
+        last unless exists $args{remaining};
         my $val = $args{remaining};
-        die "Invalid value for remaining, must be a positive number or undef"
-            unless !defined($val) || $val >= 0;
+        die "Invalid value for remaining, must be a positive number"
+            unless defined($val) && $val >= 0;
         $self->{_remaining} = $val;
-        $flags{adjust_parents_st_remaining}++;
-    }
-
-  ADJUST_PARENTS_ST_REMAINING:
-    {
-        last unless $args{-calc_all} || $flags{adjust_parents_st_remaining};
-        for my $t (@parents) {
-            my $p = $indicators{$t};
-            if (!defined($p->{_st_remaining}) || !defined($old_remaining)) {
-                # skip
-            } elsif (!defined($self->{_remaining})) {
-                undef $p->{_st_remaining};
-            } else {
-                say "TMP: task=$task, diff=", ($self->{_remaining} - $old_remaining);
-                $p->{_st_remaining} += $self->{_remaining} - $old_remaining;
-            }
-        }
-    }
-
-  UPDATE_ELAPSED:
-    my $now = time();
-    {
-        last unless $mtime;
-        my $diff = $now - $mtime;
-        for my $t (keys %indicators) {
-            my $p = $indicators{$t};
-            next unless $p->{state} eq 'started';
-            $p->{_elapsed} += $diff;
-        }
+        $self->{_set_remaining_time} = $now;
     }
 
   SET_STATE:
-    my $old_state = $self->{state};
     {
-        if (exists $args{state}) {
-            my $val = $args{state} // 'started';
-            die "Invalid value for state, must be stopped/started/finished"
-                unless $val =~ /\A(?:stopped|started|finished)\z/;
-            last if $self->{state} eq $val;
-            $self->{state} = $val;
+        last unless exists $args{state};
+        my $old = $self->{state};
+        my $val = $args{state} // 'started';
+        die "Invalid value for state, must be stopped/started/finished"
+            unless $val =~ /\A(?:stopped|started|finished)\z/;
+        last if $old eq $val;
+        if ($val eq 'started') {
+            $self->{_start_time} = $now;
+
             # automatically start parents
-            if ($val eq 'started') {
-                for my $t (@parents) {
-                    my $p = $indicators{$t};
-                    $p->{state} = 'started' if $p->{state} eq 'stopped';
+            my @parents;
+            {
+                my $t = $task;
+                while (1) {
+                    last unless $t =~ s/\.\w+\z//;
+                    push @parents, $t;
+                }
+                push @parents, '';
+            }
+            for my $t (@parents) {
+                my $p = $indicators{$t};
+                if ($p->{state} ne 'started') {
+                    $p->{state}       = 'started';
+                    $p->{_start_time} = $now;
                 }
             }
+        } else {
+            $self->{_elapsed} += $now - $self->{_start_time};
+            if ($val eq 'finished') {
+                die "BUG: Can't finish task '$task', pos is still < target"
+                    if defined($self->{target}) &&
+                        $self->{pos} < $self->{target};
+                $self->{_remaining} = 0;
+                $self->{_set_remaining_time} = $now;
+            }
         }
+        $self->{state} = $val;
     }
 
   DONE:
-    $mtime = $now;
-
     #use Data::Dump; print "after update: "; dd $self;
     return;
 }
@@ -458,8 +394,7 @@ sub finish {
 
 # - currently used letters: emnPpRrTt%
 # - currently used by Output::TermProgressBarColor: bB
-# - letters that can be used later: c (ctime?), s (last start time?), S (last
-#   stop time? state?)
+# - letters that can be used later: s (state)
 sub fill_template {
     my ($self, $template, %args) = @_;
 
@@ -762,8 +697,8 @@ title might be C<Copying files to remote server>.
 =head2 target => POSNUM (default: 0)
 
 The total number of items to finish. Can be set to undef to mean that we don't
-know (yet) how many items there are to finish (in which case, C<remaining> and
-C<pctcomp> will also be set to undef to reflect this fact).
+know (yet) how many items there are to finish (in which case, we cannot estimate
+percent of completion and remaining time).
 
 =head2 pos => POSNUM* (default: 0)
 
@@ -780,33 +715,9 @@ running and will stay at 0. C<update()> will set the state to C<started> to get
 elapsed time to run. At the end of task, you can call C<finish()> (or
 alternatively set C<state> to C<finished>) to stop the elapsed time again.
 
-The difference between C<stopped> and C<finished> is: when target and pos are
-both at 0, C<pctcomp> will be set to 0 on C<stopped>, and 100 on C<finished>.
-
-=head2 remaining => POSNUM (default: 0)
-
-Estimated remaining time until the task is finished, in seconds. You can set
-this value, for example at the beginning to give users an approximation, even
-though you don't set C<target>. However, whenever C<pos> or C<target> is
-set/changed, this attribute will be recalculated.
-
-=head2 elapsed => FLOAT
-
-A read-only attribute, elapsed time for this progress indicator. Elapsed time
-starts at zero and does not run until state is set to C<started> (via
-C<update()>).
-
-=head2 pctcomp => NUM (default: 0)
-
-Percentage of completion, a number between 0 and 100. This is a read-only
-attribute and (re)calculated whenever there's a change in C<target> or C<pos> or
-C<finished>: if C<target> is undef, C<pctcomp> will be undef, if C<target> is 0,
-C<pctcomp> is set to 0 if C<finished> is false, or 100 if C<finished> is true.
-
-=head2 ctime => NUM
-
-A read-only attribute, Unix timestamp when the indicator is created. Currently
-unused.
+The difference between C<stopped> and C<finished> is: when C<target> and C<pos>
+are both at 0, percent completed is assumed to be 0% when state is C<stopped>,
+but 100% when state is C<finished>.
 
 
 =head1 METHODS
@@ -819,7 +730,6 @@ at least C<task> must be specified.
 Note that this module maintains a list of indicator singleton objects for each
 task (in C<%indicators> package variable), so subsequent C<get_indicator()> for
 the same task will return the same object.
-
 
 =head2 $progress->update(%args)
 
@@ -870,6 +780,36 @@ Set state to C<started>.
 
 Set state to C<stopped>.
 
+=head2 $progress->elapsed() => FLOAT
+
+Get elapsed time. Just like a stop-watch, when state is C<started> elapsed time
+will run and when state is C<stopped>, it will freeze.
+
+=head2 $progress->remaining() => undef|FLOAT
+
+Give estimated remaining time until task is finished, which will depend on how
+fast the C<update()> is called, i.e. how fast C<pos> is approaching C<target>.
+Will be undef if C<target> is undef.
+
+=head2 $progress->total_remaining() => undef|FLOAT
+
+Give estimated remaining time added by all its subtasks' remaining. Return undef
+if any one of those time is undef.
+
+=head2 $progress->total_pos() => FLOAT
+
+Total of indicator's pos and all of its subtasks'.
+
+=head2 $progress->total_target() => undef|FLOAT
+
+Total of indicator's target and all of its subtasks'. Return undef if any one of
+those is undef.
+
+=head2 $progress->percent_complete() => undef|FLOAT
+
+Give percentage of completion, calculated using C<< total_pos / total_target *
+100 >>. Undef if total_target is undef.
+
 =head2 $progress->fill_template($template)
 
 Fill template with values, like in C<sprintf()>. Usually used by output modules.
@@ -889,19 +829,20 @@ Task title (the value of the C<title> attribute).
 
 =item * C<%(width)e>
 
-Elapsed time. Currently using L<Time::Duration> concise format, e.g. 10s, 1m40s,
-16m40s, 1d4h, and so on. Format might be configurable and localizable in the
-future. Default width is -8. Examples:
+Elapsed time (the result from the C<elapsed()> method). Currently using
+L<Time::Duration> concise format, e.g. 10s, 1m40s, 16m40s, 1d4h, and so on.
+Format might be configurable and localizable in the future. Default width is -8.
+Examples:
 
  2m30s
  10s
 
 =item * C<%(width)r>
 
-Estimated remaining time (the value of the C<remaining> attribute). Currently
-using L<Time::Duration> concise format, e.g. 10s, 1m40s, 16m40s, 1d4h, and so
-on. Will show C<?> if unknown. Format might be configurable and localizable in
-the future. Default width is -8. Examples:
+Estimated remaining time (the result of the C<total_remaining()> method).
+Currently using L<Time::Duration> concise format, e.g. 10s, 1m40s, 16m40s, 1d4h,
+and so on. Will show C<?> if unknown. Format might be configurable and
+localizable in the future. Default width is -8. Examples:
 
  1m40s
  5s
@@ -917,17 +858,19 @@ localizable in the future. Default width is -8. Examples:
 
 =item * C<%(width).(prec)p>
 
-Percentage of completion (the value of the C<pctcomp> attribute). C<width> and
-C<precision> are optional, like C<%f> in Perl's C<sprintf()>, default is
-C<%3.0p>. If percentage is unknown (due to target being undef), will show C<?>.
+Percentage of completion (the result of the C<percent_complete()> method).
+C<width> and C<precision> are optional, like C<%f> in Perl's C<sprintf()>,
+default is C<%3.0p>. If percentage is unknown (due to target being undef), will
+show C<?>.
 
 =item * C<%(width)P>
 
-Current position (the value of the C<pos> attribute).
+Current position (the result of the C<total_pos()> method).
 
 =item * C<%(width)T>
 
-Target (the value of the C<target> attribute). If undefined, will show C<?>.
+Target (the result of the C<total_target()> method). If undefined, will show
+C<?>.
 
 =item * C<%m>
 

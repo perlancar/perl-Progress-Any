@@ -4,88 +4,123 @@ use 5.010;
 use strict;
 use warnings;
 
-use Test::More 0.98;
 use Progress::Any;
+use Test::More 0.98;
+use Test::Exception;
+use Time::HiRes qw(sleep);
 
-%Progress::Any::indicators = ();
+subtest "get_indicator, {total_,pos}, {total_,}target, percent_complete" => sub {
 
-subtest "get_indicator, pos, target, total_target" => sub {
+    %Progress::Any::indicators = ();
+
     my $p_ab = Progress::Any->get_indicator(task=>"a.b", target=>10);
     is($p_ab->pos, 0, "a.b's pos");
+    is($p_ab->total_pos, 0, "a.b's total_pos");
     is($p_ab->target, 10, "a.b's target");
     is($p_ab->total_target, 10, "a.b's total target");
+    is($p_ab->percent_complete, 0, "a.b's percent_complete");
 
     my $p_a  = Progress::Any->get_indicator(task=>"a");
     is($p_a->pos, 0, "a's target");
+    is($p_a->total_pos, 0, "a's target");
     is($p_a->target, 0, "a's target");
     is($p_a->total_target, 10, "a's total target");
+    is($p_a->percent_complete, 0, "a's percent_complete");
+
+    my $p_ = Progress::Any->get_indicator(task=>"");
+    is($p_->pos, 0, "root's target");
+    is($p_->total_pos, 0, "root's target");
+    is($p_->target, 0, "root's target");
+    is($p_->total_target, 10, "root's total target");
+    is($p_->percent_complete, 0, "root's percent_complete");
 
     my $p_abd = Progress::Any->get_indicator(task=>"a.b.d", target=>7, pos=>2);
     is($p_abd->pos, 2, "a.b.d's pos");
+    is($p_abd->total_pos, 2, "a.b.d's total_pos");
     is($p_abd->target, 7, "a.b.d's target");
     is($p_abd->total_target, 7, "a.b.d's total target");
-    is($p_ab->pos, 2, "a.b's pos");
+    is(sprintf("%.0f", $p_abd->percent_complete), 29, "a.b.d's percent_complete");
+    is($p_ab->total_pos, 2, "a.b's total_pos");
     is($p_ab->total_target, 17, "a.b's total target");
+    is(sprintf("%.0f", $p_ab->percent_complete), 12, "a.b's percent_complete");
+    is($p_a->total_pos, 2, "a's total pos");
     is($p_a->total_target, 17, "a's total target");
+    is(sprintf("%.0f", $p_a->percent_complete), 12, "a's percent_complete");
+    is($p_->total_pos, 2, "root's total pos");
+    is($p_->total_target, 17, "root's total target");
+    is(sprintf("%.0f", $p_->percent_complete), 12, "root's percent_complete");
 
     my $p_ac = Progress::Any->get_indicator(task=>"a.c", target=>5, pos=>1);
     is($p_ac->pos, 1, "a.c's pos");
+    is($p_ac->total_pos, 1, "a.c's total_pos");
     is($p_ac->target, 5, "a.c's target");
     is($p_ac->total_target, 5, "a.c's total target");
-    is($p_a->pos, 3, "a's pos");
+    is(sprintf("%.0f", $p_ac->percent_complete), 20, "a.c's percent_complete");
+    is($p_a->total_pos, 3, "a's pos");
     is($p_a->total_target, 22, "a's total target");
+    is(sprintf("%.0f", $p_a->percent_complete), 14, "a's percent_complete");
+    is($p_->total_pos, 3, "root's pos");
+    is($p_->total_target, 22, "root's total target");
+    is(sprintf("%.0f", $p_->percent_complete), 14, "root's percent_complete");
 
-    my $p_abe = Progress::Any->get_indicator(task=>"a.b.e");
-    is($p_abe->pos, 0, "a.e's pos");
-    ok(!defined($p_abe->target), "a.e's target is undef");
-    ok(!defined($p_ab->total_target), "a.b's total target becomes undef");
-    ok(!defined($p_a->total_target), "a's total target becomes undef");
+    my $p_abe = Progress::Any->get_indicator(task=>"a.b.e", target=>undef);
+    is($p_abe->pos, 0, "a.b.e's pos");
+    ok(!defined($p_abe->target), "a.b.e's target is undef");
+    ok(!defined($p_abe->percent_complete), "a.b.e's percent_complete is undef");
+    ok(!defined($p_ab->total_target), "a.b's total_target is undef");
+    ok(!defined($p_ab->percent_complete), "a.b's percent_complete is undef");
+    ok(!defined($p_a->total_target), "a's total_target is undef");
+    ok(!defined($p_a->percent_complete), "a's percent_complete is undef");
+    ok(!defined($p_->total_target), "root's total_target is undef");
+    ok(!defined($p_->percent_complete), "root's percent_complete is undef");
+
+    dies_ok { Progress::Any->get_indicator(task=>'foo', foo=>1) }
+        'unknown arg in get_indicator() -> dies';
+
+    dies_ok { Progress::Any->get_indicator(task=>'foo', target=>-1) }
+        'invalid target in get_indicator() -> dies';
+
+    dies_ok { Progress::Any->get_indicator(task=>'foo', pos=>-1) }
+        'invalid pos in get_indicator() -> dies';
 };
 
-subtest "target" => sub {
-    my $p = Progress::Any->get_indicator(task=>"a.b.e");
+subtest "update, state, elapsed, start, stop, finish" => sub {
 
-    # stays undef
-    $p->target(undef);
+    %Progress::Any::indicators = ();
 
-    ok(!defined($Progress::Any::indicators{"a"}{ctarget}), "a's ctarget stays undefined");
-    ok(!defined($Progress::Any::indicators{"a.b"}{ctarget}), "a.b's ctarget stays undefined");
+    my $p = Progress::Any->get_indicator(task=>"a.b", target=>10);
 
-    # undef becomes defined
-    $p->target(3);
+    is($p->state, 'stopped', 'state before update() 1');
+    is($p->pos, 0, 'pos before update() 1');
 
-    is($Progress::Any::indicators{"a"}{ctarget}, 25, "a's ctarget becomes defined");
-    is($Progress::Any::indicators{"a.b"}{ctarget}, 10, "a.b's ctarget becomes defined");
+    sleep 0.05;
+    is($p->elapsed, 0, "elapsed doesn't run before update() 1");
+    $p->update;
+    is($p->state, 'started', 'state after update() 1');
+    is($p->pos, 1, 'pos after update() 1');
+    my $p_a = Progress::Any->get_indicator(task=>"a");
+    is($p_a->state, 'started', 'parent a is automatically started by update()');
+    my $p_ = Progress::Any->get_indicator(task=>"");
+    is($p_->state, 'started', 'parent root is automatically started by update()');
 
-    # defined stays defined
-    $p->target(5);
+    sleep 0.05;
+    is(sprintf("%.2f", $p->elapsed), "0.05", "elapsed runs after update() 1");
+    $p->stop;
 
-    is($Progress::Any::indicators{"a"}{ctarget}, 27, "a's ctarget updated");
-    is($Progress::Any::indicators{"a.b"}{ctarget}, 12, "a.b's ctarget updated");
+    sleep 0.05;
+    is(sprintf("%.2f", $p->elapsed), "0.05", "elapsed doesn't after stop()");
+    $p->start;
 
-    # defined becomes undef
-    $p->target(undef);
+    sleep 0.05;
+    is(sprintf("%.2f", $p->elapsed), "0.10", "elapsed runs again after start()");
+    $p->update(pos=>8);
+    is($p->pos, 8, "update() 2 with specified pos");
 
-    ok(!defined($Progress::Any::indicators{"a"}{ctarget}), "a's ctarget becomes undefined");
-    ok(!defined($Progress::Any::indicators{"a.b"}{ctarget}), "a.b's ctarget becomes undefined");
+    dies_ok { $p->update(foo=>1) } 'unknown arg in update() -> dies';
+
 };
 
-subtest "pos" => sub {
-    my $p = Progress::Any->get_indicator(task=>"a.b.e");
-
-    $p->pos(1);
-
-    is($Progress::Any::indicators{"a"}{pos}, 4, "a's pos updated");
-    is($Progress::Any::indicators{"a.b"}{pos}, 3, "a.b's pos updated");
-
-    $p->pos(3);
-
-    is($Progress::Any::indicators{"a"}{pos}, 6, "a's pos updated (2)");
-    is($Progress::Any::indicators{"a.b"}{pos}, 5, "a.b's pos updated (2)");
-};
-
-#subtest "update" => sub {
-#};
+# XXX subtest remaining, set remaining, remaining_total
 
 #subtest "fill_template" => sub {
 #};

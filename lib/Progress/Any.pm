@@ -429,10 +429,15 @@ sub fill_template {
         } elsif ($conv eq 'm') {
             $data = $args{message} // '';
         } elsif ($conv eq 'p') {
-            $data = $p->percent_complete;
+            my $val = $p->percent_complete;
             $width //= 3;
-            $prec //= 0;
-            $sconv = "f";
+            if (defined $val) {
+                $data = $val;
+                $prec //= 0;
+                $sconv = "f";
+            } else {
+                $data = '?';
+            }
         } elsif ($conv eq 'P') {
             $data = $p->total_pos;
             $prec //= 0;

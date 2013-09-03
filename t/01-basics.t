@@ -146,6 +146,7 @@ subtest "fill_template" => sub {
     is($pa->fill_template("%R"), "2s left         ", "R");
     $pa->target(undef);
     is($pa->fill_template("%R"), "1s elapsed      ", "R");
+    is($pa->fill_template("%p"), "  ?", "p unknown");
 
 };
 

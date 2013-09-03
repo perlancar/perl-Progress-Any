@@ -10,7 +10,6 @@ use Test::Exception;
 use Time::HiRes qw(sleep);
 
 subtest "get_indicator, {total_,pos}, {total_,}target, percent_complete" => sub {
-
     %Progress::Any::indicators = ();
 
     my $p_ab = Progress::Any->get_indicator(task=>"a.b", target=>10);
@@ -74,6 +73,9 @@ subtest "get_indicator, {total_,pos}, {total_,}target, percent_complete" => sub 
     ok(!defined($p_->total_target), "root's total_target is undef");
     ok(!defined($p_->percent_complete), "root's percent_complete is undef");
 
+    dies_ok { Progress::Any->get_indicator(task=>'a b') }
+        'invalid task in get_indicator() -> dies';
+
     dies_ok { Progress::Any->get_indicator(task=>'foo', foo=>1) }
         'unknown arg in get_indicator() -> dies';
 
@@ -85,7 +87,6 @@ subtest "get_indicator, {total_,pos}, {total_,}target, percent_complete" => sub 
 };
 
 subtest "update, state, elapsed, start, stop, finish" => sub {
-
     %Progress::Any::indicators = ();
 
     my $p = Progress::Any->get_indicator(task=>"a.b", target=>10);
@@ -117,13 +118,36 @@ subtest "update, state, elapsed, start, stop, finish" => sub {
     is($p->pos, 8, "update() 2 with specified pos");
 
     dies_ok { $p->update(foo=>1) } 'unknown arg in update() -> dies';
-
 };
 
 # XXX subtest remaining, set remaining, remaining_total
 
-#subtest "fill_template" => sub {
-#};
+subtest "fill_template" => sub {
+    %Progress::Any::indicators = ();
+
+    my $pa = Progress::Any->get_indicator(task=>"a", title=>"alf", target=>40);
+    my $pb = Progress::Any->get_indicator(task=>"b", title=>"boo", target=>40);
+    my $p_ = Progress::Any->get_indicator(task=>"");
+
+    $pa->update();
+    sleep 0.05;
+
+    is($pa->fill_template("%t"), "alf", "t");
+    is($pa->fill_template("%3n"), "  a", "n, width");
+    is($pa->fill_template("%-3m", message=>"b"), "b  ", "m, negative width");
+    is($pa->fill_template("%%"), "%", "%");
+    is($pa->fill_template("%%"), "%", "%");
+    is($pa->fill_template("%e"), "1s      ", "e, default");
+    is($pa->fill_template("%2e"), "1s", "e, width");
+    is($pa->fill_template("%p%%"), "  2%", "p");
+    is($p_->fill_template("%p%%"), "  1%", "p root");
+    is($pa->fill_template("%r"), "2s      ", "r");
+    #is($p_->fill_template("%r"), "4s      ", "r root");
+    is($pa->fill_template("%R"), "2s left         ", "R");
+    $pa->target(undef);
+    is($pa->fill_template("%R"), "1s elapsed      ", "R");
+
+};
 
 DONE_TESTING:
 done_testing;

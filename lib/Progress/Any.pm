@@ -398,6 +398,8 @@ sub finish {
 sub fill_template {
     my ($self, $template, %args) = @_;
 
+    # TODO: some caching so "%e%e" produces two identical numbers
+
     state $re = qr{( # all=1
                        %
                        ( #width=2
@@ -407,8 +409,9 @@ sub fill_template {
                        ( #prec=4
                            \d+)?
                        ( #conv=5
-                           [taeEpcCm%])
+                           [emnPpRrTt%])
                    )}x;
+
     state $sub = sub {
         my %args = @_;
 
@@ -417,95 +420,59 @@ sub fill_template {
         my $p = $args{indicator};
 
         my ($fmt, $sconv, $data);
-        if ($conv eq 't') {
+        if ($conv eq 'n') {
             $data = $p->{task};
-        } elsif ($conv eq 'a') {
-            $data = Time::Duration::concise(Time::Duration::duration(
-                $args{time} - $p->{ctime}));
-        } elsif ($conv =~ /[eEpC]/o) {
-            my $tot = $p->_total_target;
-            $width //= 3 if $conv eq 'p';
-
-            if (!defined($tot)) {
-                if ($conv eq 'E') {
-                    # to prevent duration() produces "just now"
-                    my $tot = $tot || 1;
-
-                    $data = Time::Duration::concise(
-                        Time::Duration::duration($tot));
-                    $data = "$data elapsed"; # XXX localize
-                } else {
-                    # can't estimate
-                    $data = '?';
-                }
-            } else {
-                if ($conv eq 'e' || $conv eq 'E') {
-                    my $totinc = 0;
-                    my $totelapsed = 0;
-                    my $eta;
-                    my $rest = $tot - $self->{pos};
-                    if ($rest <= 0) {
-                        $eta = 0;
-                    } else {
-                        # first calculate by moving average
-                        for (0..@{ $self->{incs} }-1) {
-                            $totinc     += $self->{incs}[$_];
-                            $totelapsed += $self->{elapseds}[$_];
-                        }
-                        if ($totinc == 0) {
-                            # if not moving at all recently, calculate using
-                            # total average
-                            if ($self->{pos} > 0) {
-                                $totinc     = $self->{pos};
-                                $totelapsed = $args{time} - $self->{ctime};
-                            }
-                        }
-                        if ($totinc > 0) {
-                            $eta = $totelapsed * $rest/$totinc;
-                            #say "D: AVG: totinc=$totinc, totelapsed=$totelapsed, eta=$eta";
-                        }
-                    }
-                    if (defined $eta) {
-                        # to prevent duration() produces "just now"
-                        $eta = 1 if $eta < 1;
-
-                        $data = Time::Duration::concise(
-                            Time::Duration::duration($eta));
-                        if ($conv eq 'E') {
-                            $data = "$data left"; # XXX localize
-                        }
-                    } else {
-                        if ($conv eq 'E') {
-                            # to prevent duration() produces "just now"
-                            my $totelapsed = $totelapsed || 1;
-
-                            $data = Time::Duration::concise(
-                                Time::Duration::duration($totelapsed));
-                            $data = "$data elapsed"; # XXX localize
-                        } else {
-                            $data = '?';
-                        }
-                    }
-                } elsif ($conv eq 'p' || $conv eq 'C') {
-                    $sconv = 'f';
-                    $dot = '.';
-                    $prec //= 0;
-                    if ($conv eq 'p') {
-                        $data = $p->{pos} / $tot * 100.0;
-                    } else {
-                        $data = $tot;
-                    }
-                }
-            }
-        } elsif ($conv eq 'c') {
-            $data = $p->{pos};
-            $sconv = 'f';
-            $dot = '.';
-            $prec //= 0;
-        } elsif ($conv eq 'm') {
-            $data = $args{message};
+        } elsif ($conv eq 't') {
+            $data = $p->{title};
         } elsif ($conv eq '%') {
             $data = '%';
+        } elsif ($conv eq 'm') {
+            $data = $args{message} // '';
+        } elsif ($conv eq 'p') {
+            $data = $p->percent_complete;
+            $width //= 3;
+            $prec //= 0;
+            $sconv = "f";
+        } elsif ($conv eq 'P') {
+            $data = $p->total_pos;
+            $prec //= 0;
+            $sconv = "f";
+        } elsif ($conv eq 'T') {
+            my $val = $p->total_target;
+            if (defined $val) {
+                $data = $val;
+                $prec //= 0;
+                $sconv = "f";
+            } else {
+                $data = '?';
+            }
+        } elsif ($conv eq 'e') {
+            my $val = $p->elapsed;
+            $val = 1 if $val < 1; # TMP, prevent duration() return "just now"
+            $data = Time::Duration::concise(Time::Duration::duration($val));
+            $width //= -8;
+        } elsif ($conv eq 'r') {
+            my $val = $p->total_remaining;
+            if (defined $val) {
+                $val = 1 if $val < 1; # TMP, prevent duration() return "just now
+                $data = Time::Duration::concise(Time::Duration::duration($val));
+            } else {
+                $data = '?';
+            }
+            $width //= -8;
+        } elsif ($conv eq 'R') {
+            my $val = $p->total_remaining;
+            if (defined $val) {
+                $val = 1 if $val < 1; # TMP, prevent duration() return "just now
+                $data = Time::Duration::concise(Time::Duration::duration($val)).
+                    " left"; # XXX i18n
+            } else {
+                $val = $p->elapsed;
+                $val = 1 if $val < 1; # TMP, prevent duration() return "just now
+                $data = Time::Duration::concise(Time::Duration::duration($val)).
+                    " elapsed"; # XXX i18n
+            }
+            $width //= -(8 + 1 + 7);
         } else {
             # return as-is
             $fmt = '%s';
@@ -513,9 +480,11 @@ sub fill_template {
         }
 
         # sprintf format
-        $fmt //= join("", grep {defined} (
-            "%", $width, $dot, $prec, $sconv//"s"));
+        $sconv //= 's';
+        $dot = "." if $sconv eq 'f';
+        $fmt //= join("", grep {defined} ("%", $width, $dot, $prec, $sconv));
 
+        #say "D:fmt=$fmt";
         sprintf $fmt, $data;
 
     };
@@ -538,10 +507,9 @@ In your module:
      my @urls = @_;
      return unless @urls;
      my $progress = Progress::Any->get_indicator(
-         task => "download", pos=>0, target=>~~@urls);
+         task => "download", target=>~~@urls);
      for my $url (@urls) {
          # download the $url ...
-         # update() by default increases pos by 1
          $progress->update(message => "Downloaded $url");
      }
      $progress->finish;
@@ -570,22 +538,22 @@ Another example, demonstrating multiple indicators and the LogAny output:
  use Progress::Any::Output;
  use Log::Any::App;
 
- Progress::Any::Output->set('LogAny', format => '[%t] [%P/%T] %m');
- my $p1 = Progress::Any->get_indicator(task => 'main.download');
- my $p2 = Progress::Any->get_indicator(task => 'main.copy');
+ Progress::Any::Output->set('LogAny', format => '[%-8t] [%P/%2T] %m');
+ my $pdl = Progress::Any->get_indicator(task => 'download');
+ my $pcp = Progress::Any->get_indicator(task => 'copy');
 
- $p1->target(10);
- $p1->update(message => "downloading A");
- $p2->update(message => "copying A");
- $p1->update(message => "downloading B");
- $p2->update(message => "copying B");
+ $pdl->target(10);
+ $pdl->update(message => "downloading A");
+ $pcp->update(message => "copying A");
+ $pdl->update(message => "downloading B");
+ $pcp->update(message => "copying B");
 
 will show something like:
 
- [main.download] [1/10] downloading A
- [main.copy] [1/?] copying A
- [main.download] [2/10] downloading B
- [main.copy] [2/?] copying B
+ [download] [1/10] downloading A
+ [copy    ] [1/ ?] copying A
+ [download] [2/10] downloading B
+ [copy    ] [2/ ?] copying B
 
 
 =head1 STATUS
@@ -653,18 +621,6 @@ but without percentage indicator), but can still show messages.
 Target can be changed in the middle of things.
 
 =back
-
-
-=head1 VARIABLES
-
-=head2 $mtime => NUM
-
-Unix timestamp of when update() is last called. Only a single value is needed
-for this, that's why it is put as a package variable instead of object
-attribute. When displaying remaining or elapsed time, the times are adjusted
-against this value. For example, if C<update()> is called 3 seconds ago,
-remaining time is assumed to decrease by 3 seconds and elapsed time to increase
-by 3 seconds.
 
 
 =head1 EXPORTS
@@ -851,7 +807,7 @@ localizable in the future. Default width is -8. Examples:
 
 Estimated remaining time I<or> elapsed time, if estimated remaining time is not
 calculatable (e.g. when target is undefined). Format might be configurable and
-localizable in the future. Default width is -8. Examples:
+localizable in the future. Default width is -(8+1+7). Examples:
 
  30s left
  1m40s elapsed

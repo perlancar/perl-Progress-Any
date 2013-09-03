@@ -135,6 +135,7 @@ subtest "fill_template" => sub {
     is($pa->fill_template("%t"), "alf", "t");
     is($pa->fill_template("%3n"), "  a", "n, width");
     is($pa->fill_template("%-3m", message=>"b"), "b  ", "m, negative width");
+    is($pa->fill_template("%m"), "", "m defaults to ''");
     is($pa->fill_template("%%"), "%", "%");
     is($pa->fill_template("%%"), "%", "%");
     is($pa->fill_template("%e"), "1s      ", "e, default");
@@ -147,6 +148,9 @@ subtest "fill_template" => sub {
     $pa->target(undef);
     is($pa->fill_template("%R"), "1s elapsed      ", "R");
     is($pa->fill_template("%p"), "  ?", "p unknown");
+    is($pa->fill_template("%T"), "?", "T unknown");
+
+    is($pa->fill_template("%z"), "%z", "unknown template returns as-is");
 
 };
 

@@ -104,16 +104,16 @@ subtest "update, state, elapsed, start, stop, finish" => sub {
     my $p_ = Progress::Any->get_indicator(task=>"");
     is($p_->state, 'started', 'parent root is automatically started by update()');
 
-    sleep 0.05;
-    is(sprintf("%.2f", $p->elapsed), "0.05", "elapsed runs after update() 1");
+    sleep 1;
+    is(sprintf("%.0f", $p->elapsed), "1", "elapsed runs after update() 1");
     $p->stop;
 
-    sleep 0.05;
-    is(sprintf("%.2f", $p->elapsed), "0.05", "elapsed doesn't after stop()");
+    sleep 1;
+    is(sprintf("%.0f", $p->elapsed), "1", "elapsed doesn't run after stop()");
     $p->start;
 
-    sleep 0.05;
-    is(sprintf("%.2f", $p->elapsed), "0.10", "elapsed runs again after start()");
+    sleep 1;
+    is(sprintf("%.0f", $p->elapsed), "2", "elapsed runs again after start()");
     $p->update(pos=>8);
     is($p->pos, 8, "update() 2 with specified pos");
 

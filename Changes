@@ -1,5 +1,12 @@
 Revision history for Progress-Any
 
+0.12    2013-09-11 (SHARYANTO)
+
+        - No functional changes. Temporarily put some tests (elapsed, etc) on
+          RELEASE_TESTING due to fragility of timing/sleep. Will need to use
+          time mocking in the future [CT].
+
+
 0.11    2013-09-08 (SHARYANTO)
 
         - No functional changes. Increase granularity of elapsed tests from

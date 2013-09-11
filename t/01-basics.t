@@ -87,6 +87,9 @@ subtest "get_indicator, {total_,pos}, {total_,}target, percent_complete" => sub 
 };
 
 subtest "update, state, elapsed, start, stop, finish" => sub {
+    plan skip_all => "Temp. put in RELEASE_TESTING due to fragility of timing"
+        unless $ENV{RELEASE_TESTING};
+
     %Progress::Any::indicators = ();
 
     my $p = Progress::Any->get_indicator(task=>"a.b", target=>10);
@@ -140,7 +143,7 @@ subtest "fill_template" => sub {
     is($pa->fill_template("%%"), "%", "%");
     is($pa->fill_template("%e"), "1s      ", "e, default");
     is($pa->fill_template("%2e"), "1s", "e, width");
-    is($pa->fill_template("%p%%"), "  2%", "p");
+    like($pa->fill_template("%p%%"), qr/^  [23]%$/, "p"); # on most systems it's 2% but on some 3%
     is($p_->fill_template("%p%%"), "  1%", "p root");
     is($pa->fill_template("%r"), "2s      ", "r");
     #is($p_->fill_template("%r"), "4s      ", "r root");

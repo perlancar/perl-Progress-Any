@@ -1,5 +1,11 @@
 Revision history for Progress-Any
 
+0.13    2014-02-26 (SHARYANTO)
+
+        - Add frequency limiting for updating outputs. Currently set at (at most
+          per) 0.5s. Will be configurable in the future.
+
+
 0.12    2013-09-11 (SHARYANTO)
 
         - No functional changes. Temporarily put some tests (elapsed, etc) on

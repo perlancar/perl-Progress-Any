@@ -1,5 +1,13 @@
 Revision history for Progress-Any
 
+0.14    2014-05-01 (SHARYANTO)
+
+        - No functional changes.
+
+        - Temporarily make template test release testing only due to being
+          timing-related and fail on some CT machines [CT].
+
+
 0.13    2014-02-26 (SHARYANTO)
 
         - Add frequency limiting for updating outputs. Currently set at (at most

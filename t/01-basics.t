@@ -126,6 +126,9 @@ subtest "update, state, elapsed, start, stop, finish" => sub {
 # XXX subtest remaining, set remaining, remaining_total
 
 subtest "fill_template" => sub {
+    plan skip_all => "Currently release testing only due to timing-related and fail on some CT machines"
+        unless $ENV{RELEASE_TESTING};
+
     %Progress::Any::indicators = ();
 
     my $pa = Progress::Any->get_indicator(task=>"a", title=>"alf", target=>40);

@@ -1,5 +1,12 @@
 Revision history for Progress-Any
 
+0.15    2014-07-29 (SHARYANTO)
+
+        - No functional changes.
+
+        - Fix Synopsis [RT#97563].
+
+
 0.14    2014-05-01 (SHARYANTO)
 
         - No functional changes.

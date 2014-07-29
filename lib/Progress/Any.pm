@@ -589,7 +589,7 @@ Another example, demonstrating multiple indicators and the LogAny output:
  use Progress::Any::Output;
  use Log::Any::App;
 
- Progress::Any::Output->set('LogAny', format => '[%-8t] [%P/%2T] %m');
+ Progress::Any::Output->set('LogAny', template => '[%-8t] [%P/%2T] %m');
  my $pdl = Progress::Any->get_indicator(task => 'download');
  my $pcp = Progress::Any->get_indicator(task => 'copy');
 

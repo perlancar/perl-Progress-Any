@@ -647,16 +647,6 @@ API might still change, will be stabilized in 1.0.
 
 =head1 DESCRIPTION
 
-Screenshots:
-
-=begin HTML
-
-<p><img src="http://blogs.perl.org/users/perlancar/progany-tpc-sample.jpg" /><br />Using TermProgressBarColor output
-
-<p><img src="http://blogs.perl.org/users/perlancar/progany-dn-sample.jpg" /><br />Using DesktopNotify output
-
-=end HTML
-
 C<Progress::Any> is an interface for applications that want to display progress
 to users. It decouples progress updating and output, rather similar to how
 L<Log::Any> decouples log producers and consumers (output). The API is also
@@ -672,6 +662,16 @@ indicators, set target and update it during work. In your application, you use
 Progress::Any::Output and set/add one or more outputs to display the progress.
 By setting output only in the application and not in modules, you separate the
 formatting/display concern from the logic.
+
+Screenshots:
+
+=begin HTML
+
+<p><img src="http://blogs.perl.org/users/perlancar/progany-tpc-sample.jpg" /><br />Using TermProgressBarColor output
+
+<p><img src="http://blogs.perl.org/users/perlancar/progany-dn-sample.jpg" /><br />Using DesktopNotify output
+
+=end HTML
 
 The list of features:
 

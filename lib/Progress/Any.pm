@@ -606,6 +606,38 @@ will show something like:
  [download] [2/10] downloading B
  [copy    ] [2/ ?] copying B
 
+If you use L<Perinci::CmdLine>, you can mark your function as expecting a
+Progress::Any object and it will be supplied to you in a special argument
+C<-progress>:
+
+ use File::chdir;
+ use Perinci::CmdLine;
+ $SPEC{check_dir} = {
+     v => 1.1,
+     args => {
+         dir => {summary=>"Path to check", schema=>"str*", req=>1, pos=>0},
+     },
+     features => {progress=>1},
+ };
+ sub check_dir {
+     my %args = @_;
+     my $progress = $args{-progress};
+     my $dir = $args{dir};
+     (-d $dir) or return [412, "No such dir: $dir"];
+     local $CWD = $dir;
+     opendir my($dh), $dir;
+     my @ent = readdir($dh);
+     $progress->pos(0);
+     $progress->target(~~@ent);
+     for (@ent) {
+         # do the check ...
+         $progress->update(message => $_);
+         sleep 1;
+     }
+     $progress->finish;
+     [200];
+ }
+ Perinci::CmdLine->new(url => '/main/check_dir')->run;
 
 =head1 STATUS
 

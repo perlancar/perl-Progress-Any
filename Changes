@@ -1,5 +1,13 @@
 Revision history for Progress-Any
 
+0.18    2014-10-14 (PERLANCAR)
+
+	- No functional changes.
+
+	- Work around Pod::Weaver's quirks (the screenshots HTML ended up
+	  in the Status section).
+
+
 0.17    2014-10-14 (PERLANCAR)
 
 	- No functional changes.

@@ -1,13 +1,14 @@
 package Progress::Any;
 
+# DATE
+# VERSION
+
 use 5.010001;
 use strict;
 use warnings;
 
 use Time::Duration qw();
 use Time::HiRes qw(time);
-
-# VERSION
 
 sub import {
     my ($self, @args) = @_;

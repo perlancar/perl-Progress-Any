@@ -1,5 +1,12 @@
 Revision history for Progress-Any
 
+0.16    2014-10-14 (PERLANCAR)
+
+        - No functional changes.
+
+        - Show usage example with Perinci::CmdLine.
+
+
 0.15    2014-07-29 (SHARYANTO)
 
         - No functional changes.

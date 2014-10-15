@@ -937,10 +937,6 @@ A literal C<%> sign.
 
 =head1 FAQ
 
-=head2 Why don't you use Moo?
-
-Perhaps. For now I'm trying to be minimal and as dependency-free as possible.
-
 
 =head1 SEE ALSO
 

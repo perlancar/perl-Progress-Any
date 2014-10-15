@@ -559,7 +559,7 @@ In your module:
      my @urls = @_;
      return unless @urls;
      my $progress = Progress::Any->get_indicator(
-         task => "download", target=>~~@urls);
+         task => "download", pos=>0, target=>~~@urls);
      for my $url (@urls) {
          # download the $url ...
          $progress->update(message => "Downloaded $url");
@@ -594,6 +594,7 @@ Another example, demonstrating multiple indicators and the LogAny output:
  my $pdl = Progress::Any->get_indicator(task => 'download');
  my $pcp = Progress::Any->get_indicator(task => 'copy');
 
+ $pdl->pos(10);
  $pdl->target(10);
  $pdl->update(message => "downloading A");
  $pcp->update(message => "copying A");

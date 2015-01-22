@@ -408,6 +408,9 @@ sub update {
             if ($outputs{$task}) {
                 for my $output (@{ $outputs{$task} }) {
                     next unless $self->_should_update_output($output, $now);
+                    if (ref($message) eq 'CODE') {
+                        $message = $message->();
+                    }
                     $output->update(
                         indicator => $indicators{$task},
                         message   => $message,
@@ -796,9 +799,13 @@ Set the new position. If unspecified, defaults to current position + 1. If pos
 is larger than target, outputs will generally still show 100%. Note that
 fractions are allowed.
 
-=item * message => STR
+=item * message => str|code
 
 Set a message to be displayed when updating indicator.
+
+Aside from a string, you can also pass a coderef here. It can be used to delay
+costly calculation. The message will only be calculated when actually sent to
+output.
 
 =item * level => NUM
 

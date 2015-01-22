@@ -1,5 +1,11 @@
 Revision history for Progress-Any
 
+0.19    2015-01-22 (PERLANCAR)
+
+	- Allow message to be coderef for delaying costly calculation, will
+	  be converted to string when sent to output.
+
+
 0.18    2014-10-14 (PERLANCAR)
 
 	- No functional changes.

@@ -553,6 +553,24 @@ sub fill_template {
 
 =head1 SYNOPSIS
 
+=head2 First example, simple usage in a script
+
+ use Progress::Any '$progress';
+ use Progress::Any::Output 'TermProgressBarColor';
+
+ $progress->target(10);
+ for (1..10) {
+     $progress->update(message => "Doing item $_");
+     sleep 1;
+ }
+
+Sample output:
+
+ % ./script.pl
+  60% [Doing item 6====           ]3s left
+
+=head2 Second example, usage in module as well as script
+
 In your module:
 
  package MyApp;
@@ -578,8 +596,9 @@ In your application:
 
  MyApp::download("url1", "url2", "url3", "url4", "url5");
 
-When run, your application will display something like this, in succession:
+sample output, in succession:
 
+ % ./script.pl
   20% [====== Downloaded url1           ]0m00s Left
   40% [=======Downloaded url2           ]0m01s Left
   60% [=======Downloaded url3           ]0m01s Left
@@ -587,7 +606,7 @@ When run, your application will display something like this, in succession:
 
 (At 100%, the output automatically cleans up the progress bar).
 
-Another example, demonstrating multiple indicators and the LogAny output:
+=head3 Another example, demonstrating multiple indicators and the LogAny output:
 
  use Progress::Any;
  use Progress::Any::Output;
@@ -610,6 +629,8 @@ will show something like:
  [copy    ] [1/ ?] copying A
  [download] [2/10] downloading B
  [copy    ] [2/ ?] copying B
+
+=head2 Example of using with Perinci::CmdLine
 
 If you use L<Perinci::CmdLine>, you can mark your function as expecting a
 Progress::Any object and it will be supplied to you in a special argument
@@ -643,6 +664,7 @@ C<-progress>:
      [200];
  }
  Perinci::CmdLine->new(url => '/main/check_dir')->run;
+
 
 =head1 STATUS
 

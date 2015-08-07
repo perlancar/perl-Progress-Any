@@ -606,7 +606,7 @@ sample output, in succession:
 
 (At 100%, the output automatically cleans up the progress bar).
 
-=head3 Another example, demonstrating multiple indicators and the LogAny output:
+=head2 Another example, demonstrating multiple indicators and the LogAny output:
 
  use Progress::Any;
  use Progress::Any::Output;

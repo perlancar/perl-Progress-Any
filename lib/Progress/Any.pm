@@ -403,6 +403,7 @@ sub update {
 
     # find output(s) and call it
     {
+        last unless $ENV{PROGRESS} // 1;
         my $task = $self->{task};
         while (1) {
             if ($outputs{$task}) {
@@ -965,6 +966,13 @@ A literal C<%> sign.
 
 
 =head1 FAQ
+
+
+=head1 ENVIRONMENT
+
+=head2 PROGRESS
+
+Boolean. Default 1. Can be set to 0 to display progress output.
 
 
 =head1 SEE ALSO

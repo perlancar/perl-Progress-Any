@@ -759,34 +759,42 @@ Below are the attributes of an indicator/task:
 
 =head2 task
 
-str. Default: from caller's package, or C<main>.
+String. Default: from caller's package, or C<main>.
 
 Task name. If not specified will be set to caller's package (C<::> will be
 replaced with C<.>), e.g. if you are calling this method from
 C<Foo::Bar::baz()>, then task will be set to C<Foo.Bar>. If caller is code
 inside eval, C<main> will be used instead.
 
-=head2 title => STR* (default: task name)
+=head2 title
+
+String. Default: task name.
 
 Specify task title. Task title is a longer description for a task and can
 contain spaces and other characters. It is displayed in some outputs, as well as
 using C<%t> in C<fill_template()>. For example, for a task called C<copy>, its
 title might be C<Copying files to remote server>.
 
-=head2 target => POSNUM (default: 0)
+=head2 target
+
+Non-negative number. Default: 0.
 
 The total number of items to finish. Can be set to undef to mean that we don't
 know (yet) how many items there are to finish (in which case, we cannot estimate
 percent of completion and remaining time).
 
-=head2 pos => POSNUM* (default: 0)
+=head2 pos
+
+Non-negative number. Default: 0.
 
 The number of items that are already done. It cannot be larger than C<target>,
 if C<target> is defined. If C<target> is set to a value smaller than C<pos> or
 C<pos> is set to a value larger than C<target>, C<pos> will be changed to be
 C<target>.
 
-=head2 state => STR (default: C<stopped>)
+=head2 state
+
+String. Default: C<stopped>.
 
 State of task/indicator. Either: C<stopped>, C<started>, or C<finished>.
 Initially it will be set to C<stopped>, which means elapsed time won't be

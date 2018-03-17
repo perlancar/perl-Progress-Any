@@ -454,12 +454,9 @@ our $template_regex = qr{( # all=1
                              ( #prec=4
                                  \d+)?
                              ( #conv=5
-                                 [emnPpRrTt%])
+                                 [A-Za-z%])
                          )}x;
 
-# - currently used letters: emnPpRrTt%
-# - currently used by Output::TermProgressBarColor: bB
-# - letters that can be used later: s (state)
 sub fill_template {
     my ($self, $template0, %args) = @_;
 
@@ -544,8 +541,13 @@ sub fill_template {
             if ($opts->{handle_unknown_conversion}) {
                 my @res = $opts->{handle_unknown_conversion}->(
                     indicator => $p,
-                    conv => $conv,
-                    args => \%args,
+                    args  => \%args,
+
+                    all   => $all,
+                    width => $width,
+                    dot   => $dot,
+                    conv  => $conv,
+                    prec  => $prec,
                 );
                 if (@res) {
                     ($fmt, $data) = @res;
@@ -568,7 +570,6 @@ sub fill_template {
 
         #say "D:fmt=$fmt";
         sprintf $fmt, $data;
-
     };
     $template =~ s{$template_regex}{$sub->(%args, indicator=>$self)}egox;
 

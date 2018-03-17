@@ -612,38 +612,32 @@ Example of using in a module as well as script:
      $progress->finish;
  }
 
-In your application:
-
+ # in script.pl
  use MyApp;
  use Progress::Any::Output;
  Progress::Any::Output->set('TermProgressBarColor');
 
  MyApp::download("url1", "url2", "url3", "url4", "url5");
 
-sample output, in succession:
+Sample output:
 
  % ./script.pl
   20% [====== Downloaded url1           ]0m00s Left
-  40% [=======Downloaded url2           ]0m01s Left
-  60% [=======Downloaded url3           ]0m01s Left
-  80% [=======Downloaded url4==         ]0m00s Left
 
-(At 100%, the output automatically cleans up the progress bar).
-
-=head2 Another example, demonstrating multiple indicators and the LogAny output:
+Example that demonstrates multiple indicator objects:
 
  use Progress::Any;
  use Progress::Any::Output;
- use Log::Any::App;
 
- Progress::Any::Output->set('LogAny', template => '[%-8t] [%P/%2T] %m');
  my $pdl = Progress::Any->get_indicator(task => 'download');
+ Progress::Any::Output->set({task=>'download'}, 'TermMessage', template => '[%-8t] [%P/%2T] %m');
  my $pcp = Progress::Any->get_indicator(task => 'copy');
+ Progress::Any::Output->set({task=>'copy'    }, 'TermMessage', template => '[%-8t] [%P/%2T] %m');
 
- $pdl->pos(10);
  $pdl->target(10);
  $pdl->update(message => "downloading A");
  $pcp->update(message => "copying A");
+ sleep 1;
  $pdl->update(message => "downloading B");
  $pcp->update(message => "copying B");
 

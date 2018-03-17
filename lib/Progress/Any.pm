@@ -378,7 +378,9 @@ sub _should_update_output {
             # been passed.
             $odata->{freq} = -0.5;
         }
-        if ($odata->{freq} < 0) {
+        if ($odata->{freq} == 0) {
+            return 1;
+        } if ($odata->{freq} < 0) {
             return 1 if $now >= $odata->{mtime} - $odata->{freq};
         } else {
             return 1 if abs($self->{pos} - $odata->{pos}) >= $odata->{freq};

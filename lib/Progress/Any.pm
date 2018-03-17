@@ -352,7 +352,7 @@ sub _update {
 }
 
 sub _should_update_output {
-    my ($self, $output, $now) = @_;
+    my ($self, $output, $now, $priority) = @_;
 
     my $key = "$output";
     $output_data{$key} //= {};
@@ -367,11 +367,11 @@ sub _should_update_output {
         # force update
         delete $odata->{force_update};
         return 1;
-    # } elsif ($args->{prio} eq 'low') {
-        # perhaps provide something like this? a low-priority or minor update so
-        # we don't have to update the outputs?
+    } elsif ($priority eq 'high') {
+        # high priority, send to output module
+        return 1;
     } else {
-        # normal update, update if not too frequent
+        # normal-/low-priority update, update if not too frequent
         if (!defined($odata->{freq})) {
             # negative number means seconds, positive means pos delta. only
             # update if that number of seconds, or that difference in pos has
@@ -395,7 +395,7 @@ sub update {
     $self->_update(pos => $pos, state => $state);
 
     my $message  = delete($args{message});
-    my $level    = delete($args{level});
+    my $priority = delete($args{priority});
     die "Unknown argument(s) to update(): ".join(", ", keys(%args))
         if keys(%args);
 
@@ -408,14 +408,14 @@ sub update {
         while (1) {
             if ($outputs{$task}) {
                 for my $output (@{ $outputs{$task} }) {
-                    next unless $self->_should_update_output($output, $now);
+                    next unless $self->_should_update_output($output, $now, $priority);
                     if (ref($message) eq 'CODE') {
                         $message = $message->();
                     }
                     $output->update(
                         indicator => $indicators{$task},
                         message   => $message,
-                        level     => $level,
+                        priority  => $priority,
                         time      => $now,
                     );
                     my $key = "$output";

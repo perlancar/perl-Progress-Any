@@ -395,7 +395,7 @@ sub update {
     $self->_update(pos => $pos, state => $state);
 
     my $message  = delete($args{message});
-    my $priority = delete($args{priority});
+    my $priority = delete($args{priority}) // 'normal';
     die "Unknown argument(s) to update(): ".join(", ", keys(%args))
         if keys(%args);
 

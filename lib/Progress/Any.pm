@@ -56,7 +56,7 @@ sub _init_indicator {
     my $progress = bless({
         task        => $task,
         title       => $task,
-        target      => 0,
+        target      => undef,
         pos         => 0,
         state       => 'stopped',
 

@@ -865,12 +865,10 @@ Aside from a string, you can also pass a coderef here. It can be used to delay
 costly calculation. The message will only be calculated when actually sent to
 output.
 
-=item * level => NUM
+=item * priority => str ("normal"|"low"|"high", default: "normal")
 
-EXPERIMENTAL, NOT YET IMPLEMENTED BY MOST OUTPUTS. Setting the importance level
-of this update. Default is C<normal> (or C<low> for fractional update), but can
-be set to C<high> or C<low>. Output can choose to ignore updates lower than a
-certain level.
+Set importance level of this update. Default is C<normal>. Output can choose to
+ignore updates lower than a certain level.
 
 =item * state => STR
 

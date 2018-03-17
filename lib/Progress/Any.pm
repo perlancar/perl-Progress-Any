@@ -554,7 +554,8 @@ sub fill_template {
 
 =head1 SYNOPSIS
 
-=head2 First example, simple usage in a script
+Example of using in a script with terminal progress bar as output (progress bar
+will be cleared on C<finish()>):
 
  use Progress::Any '$progress';
  use Progress::Any::Output 'TermProgressBarColor';
@@ -564,16 +565,38 @@ sub fill_template {
      $progress->update(message => "Doing item $_");
      sleep 1;
  }
+ $progress->finish();
 
 Sample output:
 
  % ./script.pl
   60% [Doing item 6====           ]3s left
 
-=head2 Second example, usage in module as well as script
+Another example, this time with terminal message as output (see :
 
-In your module:
+ use Progress::Any '$progress';
+ use Progress::Any::Output 'TermMessage', template => '[%n] %P/%T (%6.2p%%) %m';
 
+ $progress->target(10);
+ for (1..10) {
+     $progress->update(message => "Item $_/10");
+     sleep 1;
+ }
+ sleep 1;
+ $progress->finish(message => "Finished!");
+
+Sample output:
+
+ % ./script.pl
+ [] 1/10 ( 10.00%) Item 1/10
+ [] 2/10 ( 20.00%) Item 2/10
+ ...
+ [] 10/10 (100.00%) Item 10/10
+ [] 10/10 (100.00%) Finished!
+
+Example of using in a module as well as script:
+
+ # in lib/MyApp.pm
  package MyApp;
  use Progress::Any;
 

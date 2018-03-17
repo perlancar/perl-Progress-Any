@@ -1,4 +1,13 @@
-0.211   2018-03-16 (PERLANCAR)
+0.212   2018-03-16 (PERLANCAR)
+
+        - Make regex to parse template available as package variable
+          '$template_regex'.
+
+        - fill_template(): Accept handle_unknown_conversion option to handle
+          unknown conversion.
+
+
+0.211   2018-03-17 (PERLANCAR)
 
         - [Incompatible change] update(): Rename 'level' argument to 'priority'.
           High-priority updates are now not frequency-throttled.

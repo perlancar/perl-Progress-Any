@@ -445,25 +445,34 @@ sub finish {
     $self->update(pos=>$self->{target}, state=>'finished', %args);
 }
 
+our $template_regex = qr{( # all=1
+                             %
+                             ( #width=2
+                                 -?\d+ )?
+                             ( #dot=3
+                                 \.?)
+                             ( #prec=4
+                                 \d+)?
+                             ( #conv=5
+                                 [emnPpRrTt%])
+                         )}x;
+
 # - currently used letters: emnPpRrTt%
 # - currently used by Output::TermProgressBarColor: bB
 # - letters that can be used later: s (state)
 sub fill_template {
-    my ($self, $template, %args) = @_;
+    my ($self, $template0, %args) = @_;
 
     # TODO: some caching so "%e%e" produces two identical numbers
 
-    state $re = qr{( # all=1
-                       %
-                       ( #width=2
-                           -?\d+ )?
-                       ( #dot=3
-                           \.?)
-                       ( #prec=4
-                           \d+)?
-                       ( #conv=5
-                           [emnPpRrTt%])
-                   )}x;
+    my ($template, $opts);
+    if (ref $template0 eq 'HASH') {
+        $opts = $template0;
+        $template = $opts->{template};
+    } else {
+        $template = $template0;
+        $opts = {};
+    }
 
     state $sub = sub {
         my %args = @_;
@@ -532,9 +541,24 @@ sub fill_template {
             }
             $width //= -(8 + 1 + 7);
         } else {
-            # return as-is
-            $fmt = '%s';
-            $data = $all;
+            if ($opts->{handle_unknown_conversion}) {
+                my @res = $opts->{handle_unknown_conversion}->(
+                    indicator => $p,
+                    conv => $conv,
+                    args => \%args,
+                );
+                if (@res) {
+                    ($fmt, $data) = @res;
+                } else {
+                # return as-is
+                    $fmt = '%s';
+                    $data = $all;
+                }
+            } else {
+                # return as-is
+                $fmt = '%s';
+                $data = $all;
+            }
         }
 
         # sprintf format
@@ -546,7 +570,7 @@ sub fill_template {
         sprintf $fmt, $data;
 
     };
-    $template =~ s{$re}{$sub->(%args, indicator=>$self)}egox;
+    $template =~ s{$template_regex}{$sub->(%args, indicator=>$self)}egox;
 
     $template;
 }

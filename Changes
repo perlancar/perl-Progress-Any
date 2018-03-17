@@ -1,3 +1,18 @@
+0.211   2018-03-16 (PERLANCAR)
+
+        - [Incompatible change] update(): Rename 'level' argument to 'priority'.
+          High-priority updates are now not frequency-throttled.
+
+        - [Bugfix] Indicator object's target was not initially set to undef but
+          to 0.
+
+        - Don't frequency-throttle update to output that has freq = 0.
+
+        - Read output module data via output_data().
+
+        - [doc] Fix/update/add examples.
+
+
 0.210   2018-03-16 (PERLANCAR)
 
 	- Observe PROGRESS environment variable to let user turn off

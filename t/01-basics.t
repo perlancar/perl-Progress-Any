@@ -137,7 +137,7 @@ subtest "fill_template" => sub {
 
     my $pa = Progress::Any->get_indicator(task=>"a", title=>"alf", target=>40);
     my $pb = Progress::Any->get_indicator(task=>"b", title=>"boo", target=>40);
-    my $p_ = Progress::Any->get_indicator(task=>"");
+    my $p_ = Progress::Any->get_indicator(task=>"", target=>0);
 
     $pa->update();
     sleep 0.05;

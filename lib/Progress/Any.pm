@@ -702,7 +702,7 @@ Screenshots:
 
 The list of features:
 
-=over 4
+=over
 
 =item * multiple progress indicators
 
@@ -757,7 +757,9 @@ The root indicator. Equivalent to:
 
 Below are the attributes of an indicator/task:
 
-=head2 task => STR* (default: from caller's package, or C<main>)
+=head2 task
+
+str. Default: from caller's package, or C<main>.
 
 Task name. If not specified will be set to caller's package (C<::> will be
 replaced with C<.>), e.g. if you are calling this method from
@@ -799,7 +801,11 @@ but 100% when state is C<finished>.
 
 =head1 METHODS
 
-=head2 Progress::Any->get_indicator(%args) => OBJ
+=head2 get_indicator
+
+Usage:
+
+ Progress::Any->get_indicator(%args) => obj
 
 Get a progress indicator for a certain task. C<%args> contain attribute values,
 at least C<task> must be specified.
@@ -808,13 +814,17 @@ Note that this module maintains a list of indicator singleton objects for each
 task (in C<%indicators> package variable), so subsequent C<get_indicator()> for
 the same task will return the same object.
 
-=head2 $progress->update(%args)
+=head2 update
+
+Usage:
+
+ $progress->update(%args)
 
 Update indicator. Will also, usually, update associated output(s) if necessary.
 
 Arguments:
 
-=over 4
+=over
 
 =item * pos => NUM
 
@@ -843,7 +853,11 @@ Can be set to C<finished> to finish a task.
 
 =back
 
-=head2 $progress->finish(%args)
+=head2 finish
+
+Usage:
+
+ $progress->finish(%args)
 
 Equivalent to:
 
@@ -853,45 +867,81 @@ Equivalent to:
      %args,
  );
 
-=head2 $progress->start()
+=head2 start
+
+Usage:
+
+ $progress->start()
 
 Set state to C<started>.
 
-=head2 $progress->stop()
+=head2 stop
+
+Usage:
+
+ $progress->stop()
 
 Set state to C<stopped>.
 
-=head2 $progress->elapsed() => FLOAT
+=head2 elapsed
+
+Usage:
+
+ $progress->elapsed() => float
 
 Get elapsed time. Just like a stop-watch, when state is C<started> elapsed time
 will run and when state is C<stopped>, it will freeze.
 
-=head2 $progress->remaining() => undef|FLOAT
+=head2 remaining
+
+Usage:
+
+ $progress->remaining() => undef|float
 
 Give estimated remaining time until task is finished, which will depend on how
 fast the C<update()> is called, i.e. how fast C<pos> is approaching C<target>.
 Will be undef if C<target> is undef.
 
-=head2 $progress->total_remaining() => undef|FLOAT
+=head2 total_remaining
+
+Usage:
+
+ $progress->total_remaining() => undef|FLOAT
 
 Give estimated remaining time added by all its subtasks' remaining. Return undef
 if any one of those time is undef.
 
-=head2 $progress->total_pos() => FLOAT
+=head2 total_pos
+
+Usage:
+
+ $progress->total_pos() => float
 
 Total of indicator's pos and all of its subtasks'.
 
-=head2 $progress->total_target() => undef|FLOAT
+=head2 total_target
+
+Usage:
+
+ $progress->total_target() => undef|float
 
 Total of indicator's target and all of its subtasks'. Return undef if any one of
 those is undef.
 
-=head2 $progress->percent_complete() => undef|FLOAT
+=head2 percent_complete
+
+Usage:
+
+ $progress->percent_complete() => undef|float
 
 Give percentage of completion, calculated using C<< total_pos / total_target *
 100 >>. Undef if total_target is undef.
 
-=head2 $progress->fill_template($template)
+=head2 fill_template
+
+Usage:
+
+ $progress->fill_template($template) => str
 
 Fill template with values, like in C<sprintf()>. Usually used by output modules.
 Available templates:

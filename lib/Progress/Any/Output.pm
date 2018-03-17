@@ -45,6 +45,11 @@ sub _set_or_add {
         push @{ $Progress::Any::outputs{$task} }, $outputo;
     }
 
+    if ($outputo->can("output_data")) {
+        my $odata = $outputo->output_data;
+        $Progress::Any::output_data{"$outputo"} = $odata;
+    }
+
     $outputo;
 }
 

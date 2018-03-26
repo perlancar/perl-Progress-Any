@@ -33,9 +33,6 @@ our %indicators;  # key = task name
 # store output objects
 our %outputs;     # key = task name, value = [$outputobj, ...]
 
-# store settings/data for each object
-our %output_data; # key = "$output_object", value = {key=>val, ...}
-
 # internal attributes:
 # - _elapsed (float*) = accumulated elapsed time so far
 # - _start_time (float) = when is the last time the indicator state is changed
@@ -355,35 +352,33 @@ sub _should_update_output {
     my ($self, $output, $now, $priority) = @_;
 
     my $key = "$output";
-    $output_data{$key} //= {};
-    my $odata = $output_data{$key};
-    if (!defined($odata->{mtime})) {
+    if (!defined($output->{_mtime})) {
         # output has never been updated, update
         return 1;
     } elsif ($self->{state} eq 'finished') {
         # finishing, update the output to show finished state
         return 1;
-    } elsif ($odata->{force_update}) {
+    } elsif ($output->{force_update}) {
         # force update
-        delete $odata->{force_update};
+        delete $output->{force_update};
         return 1;
     } elsif ($priority eq 'high') {
         # high priority, send to output module
         return 1;
     } else {
         # normal-/low-priority update, update if not too frequent
-        if (!defined($odata->{freq})) {
+        if (!defined($output->{freq})) {
             # negative number means seconds, positive means pos delta. only
             # update if that number of seconds, or that difference in pos has
             # been passed.
-            $odata->{freq} = -0.5;
+            $output->{freq} = -0.5;
         }
-        if ($odata->{freq} == 0) {
+        if ($output->{freq} == 0) {
             return 1;
-        } if ($odata->{freq} < 0) {
-            return 1 if $now >= $odata->{mtime} - $odata->{freq};
+        } if ($output->{freq} < 0) {
+            return 1 if $now >= $output->{_mtime} - $output->{freq};
         } else {
-            return 1 if abs($self->{pos} - $odata->{pos}) >= $odata->{freq};
+            return 1 if abs($self->{pos} - $output->{_pos}) >= $output->{freq};
         }
         return 0;
     }
@@ -420,9 +415,8 @@ sub update {
                         priority  => $priority,
                         time      => $now,
                     );
-                    my $key = "$output";
-                    $output_data{$key}{mtime} = $now;
-                    $output_data{$key}{pos}   = $pos;
+                    $output->{_mtime} = $now;
+                    $output->{_pos}   = $pos;
                 }
             }
             last unless $task =~ s/\.?\w+\z//;

@@ -1,3 +1,9 @@
+0.213   2018-03-28 (PERLANCAR)
+
+	- [Bugfix][Regression] Initialize parent indicators with target=0
+	  so percent-completion can be calculated.
+
+
 0.212   2018-03-16 (PERLANCAR)
 
         - Make regex to parse template available as package variable

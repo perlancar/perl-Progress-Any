@@ -8,6 +8,9 @@
 	- [Incompatible change] [internal] Remove output_data structure, store
 	  state in output objects directly. This simplifies things a bit.
 
+	- [Bugfix][Regression] Initialize parent indicators with target=0
+	  so percent-completion can be calculated.
+
 
 0.212   2018-03-16 (PERLANCAR)
 

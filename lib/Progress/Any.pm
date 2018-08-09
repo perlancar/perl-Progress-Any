@@ -43,7 +43,7 @@ our %outputs;     # key = task name, value = [$outputobj, ...]
 
 # return 1 if created, 0 if already created/initialized
 sub _init_indicator {
-    my ($class, $task) = @_;
+    my ($class, $task, $default_target) = @_;
 
     #say "D: _init_indicator($task)";
 
@@ -53,7 +53,7 @@ sub _init_indicator {
     my $progress = bless({
         task        => $task,
         title       => $task,
-        target      => undef,
+        target      => $default_target,
         pos         => 0,
         state       => 'stopped',
 
@@ -66,7 +66,7 @@ sub _init_indicator {
 
     # if we create an indicator named a.b.c, we must also create a.b, a, and ''.
     if ($task =~ s/\.?\w+\z//) {
-        $class->_init_indicator($task);
+        $class->_init_indicator($task, 0);
     }
 
     $progress;

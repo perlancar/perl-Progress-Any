@@ -3,6 +3,12 @@
 	- Forget to remove old code.
 
 
+0.213.1 2018-03-28 (PERLANCAR)
+
+	- [Bugfix][Regression] Initialize parent indicators with target=0
+	  so percent-completion can be calculated.
+
+
 0.213   2018-03-26 (PERLANCAR)
 
 	- [Incompatible change] [internal] Remove output_data structure, store

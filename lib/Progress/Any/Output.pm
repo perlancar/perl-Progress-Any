@@ -1,6 +1,8 @@
 package Progress::Any::Output;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -20,9 +22,17 @@ sub _set_or_add {
 
     my $opts;
     if (@_ && ref($_[0]) eq 'HASH') {
-        $opts = shift;
+        $opts = {%{shift()}}; # shallow copy
     } else {
         $opts = {};
+    }
+
+    # allow adding options via -name => val syntax, for ease in using via -M in
+    # one-liners.
+    while (1) {
+        last unless @_ && $_[0] =~ /\A-(.+)/;
+        $opts->{$1} = $_[1];
+        splice @_, 0, 2;
     }
 
     my $output = shift or die "Please specify output name";
@@ -82,6 +92,10 @@ or:
  use Progress::Any::Output 'TermProgressBarColor', width=>50, ...;
 
 To assign output to a certain (sub)task:
+
+ use Progress::Any::Output -task => "main.download", 'TermMessage';
+
+or:
 
  use Progress::Any::Output;
  Progress::Any::Output->set({task=>'main.download'}, 'TermMessage');

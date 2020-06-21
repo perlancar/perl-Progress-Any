@@ -1071,6 +1071,8 @@ Boolean. Default 1. Can be set to 0 to display progress output.
 
 =head1 SEE ALSO
 
+L<Progress::Any::Examples> distribution contains example scripts.
+
 Other progress modules on CPAN: L<Term::ProgressBar>,
 L<Term::ProgressBar::Simple>, L<Time::Progress>, among others.
 

@@ -1,3 +1,12 @@
+0.215   2020-06-21  Released-By: PERLANCAR; Urgency: medium
+
+	- Output: Accept -optname => optval, ... as an alternative to
+	  {optname=>val, ...} syntax, to ease specifying on perl one-liners
+	  using -M CLI option.
+
+	- [doc] Mention Progress::Any::Examples.
+
+
 0.214   2018-03-26  Released-By: PERLANCAR
 
 	- Forget to remove old code.
@@ -215,4 +224,3 @@
 0.01    2012-10-24  Released-By: SHARYANTO
 
         - First, early release.
-

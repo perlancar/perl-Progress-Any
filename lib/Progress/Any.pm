@@ -1,6 +1,8 @@
 package Progress::Any;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -419,6 +421,11 @@ sub update {
                         message   => $message,
                         priority  => $priority,
                         time      => $now,
+
+                        # temporary, internal API. to let an output module know
+                        # the same update() when there are multiple instances of
+                        # it
+                        _update_id => $now,
                     );
                     $output->{_mtime} = $now;
                     $output->{_pos}   = $pos;

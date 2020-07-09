@@ -603,7 +603,7 @@ Sample output:
  % ./script.pl
   60% [Doing item 6====           ]3s left
 
-Another example, this time with terminal message as output (see :
+Another example, this time with terminal message as output:
 
  use Progress::Any '$progress';
  use Progress::Any::Output 'TermMessage', template => '[%n] %P/%T (%6.2p%%) %m';

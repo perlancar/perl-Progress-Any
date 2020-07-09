@@ -1,3 +1,10 @@
+0.217   2020-07-09  Released-By: PERLANCAR; Urgency: low
+
+	- No functional changes.
+
+	- [doc] Fix typo in example in Synopsis.
+
+
 0.216   2020-07-09  Released-By: PERLANCAR; Urgency: medium
 
 	- Add reset().

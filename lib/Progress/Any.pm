@@ -444,6 +444,11 @@ sub finish {
     $self->update(pos=>$self->{target}, state=>'finished', %args);
 }
 
+sub reset {
+    my ($self, %args) = @_;
+    $self->update(pos=>0, state=>'started', %args);
+}
+
 our $template_regex = qr{( # all=1
                              %
                              ( #width=2
@@ -918,6 +923,20 @@ Equivalent to:
  $progress->update(
      ( pos => $progress->target ) x !!defined($progress->target),
      state => 'finished',
+     %args,
+ );
+
+=head2 reset
+
+Usage:
+
+ $progress->reset(%args)
+
+Equivalent to:
+
+ $progress->update(
+     pos => 0,
+     state => 'started',
      %args,
  );
 

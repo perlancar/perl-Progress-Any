@@ -399,6 +399,14 @@ sub update {
     my $message  = delete($args{message});
     my $priority = delete($args{priority}) // 'normal';
     my $force_update = delete($args{force_update});
+
+    my %other_args_for_output;
+    for (keys %args) {
+        if (/\Amessage\.alt\./) {
+            $other_args_for_output{$_} = delete $args{$_};
+        }
+    }
+
     die "Unknown argument(s) to update(): ".join(", ", keys(%args))
         if keys(%args);
 
@@ -426,6 +434,7 @@ sub update {
                         # the same update() when there are multiple instances of
                         # it
                         _update_id => $now,
+                        %other_args_for_output,
                     );
                     $output->{_mtime} = $now;
                     $output->{_pos}   = $pos;

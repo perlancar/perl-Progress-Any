@@ -42,9 +42,8 @@ sub _set_or_add {
 
     my $outputo;
     unless (ref $outputo) {
-        my $outputpm = $output; $outputpm =~ s!::!/!g; $outputpm .= ".pm";
+        (my $outputpm = "$output.pm") =~ s!::!/!g;
         require "Progress/Any/Output/$outputpm";
-        no strict 'refs';
         $outputo = "Progress::Any::Output::$output"->new(@_);
     }
 

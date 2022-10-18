@@ -19,7 +19,7 @@ sub import {
         if ($_ eq '$progress') {
             my $progress = $self->get_indicator(task => '');
             {
-                no strict 'refs';
+                no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
                 my $v = "$caller\::progress";
                 *$v = \$progress;
             }
@@ -131,7 +131,7 @@ for my $an (keys %attrs) {
             $self->{$an};
         };
     }
-    no strict 'refs';
+    no strict 'refs'; ## no critic: TestingAndDebugging::ProhibitNoStrict
     *{$an} = $code;
 }
 
@@ -168,7 +168,7 @@ sub total_target {
     my $t = $self->{task};
 
     my $res = $self->{target};
-    return undef unless defined($res);
+    return unless defined($res);
 
     for (keys %indicators) {
         if ($t eq '') {
@@ -176,7 +176,7 @@ sub total_target {
         } else {
             next unless index($_, "$t.") == 0;
         }
-        return undef unless defined $indicators{$_}{target};
+        return unless defined $indicators{$_}{target};
         $res += $indicators{$_}{target};
     }
     $res;
@@ -188,7 +188,7 @@ sub percent_complete {
     my $total_pos    = $self->total_pos;
     my $total_target = $self->total_target;
 
-    return undef unless defined($total_target);
+    return unless defined($total_target);
     if ($total_target == 0) {
         if ($self->{state} eq 'finished') {
             return 100;
@@ -219,7 +219,7 @@ sub remaining {
                     $self->elapsed;
             }
         } else {
-            return undef;
+            return;
         }
     }
 }
@@ -230,7 +230,7 @@ sub total_remaining {
     my $t = $self->{task};
 
     my $res = $self->remaining;
-    return undef unless defined $res;
+    return unless defined $res;
 
     for (keys %indicators) {
         if ($t eq '') {
@@ -239,7 +239,7 @@ sub total_remaining {
             next unless index($_, "$t.") == 0;
         }
         my $res2 = $indicators{$_}->remaining;
-        return undef unless defined $res2;
+        return unless defined $res2;
         $res += $res2;
     }
     $res;

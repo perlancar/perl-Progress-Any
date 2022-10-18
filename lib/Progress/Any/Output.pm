@@ -1,15 +1,15 @@
 package Progress::Any::Output;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
 
 require Progress::Any;
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 sub import {
     my $self = shift;
@@ -43,7 +43,7 @@ sub _set_or_add {
     my $outputo;
     unless (ref $outputo) {
         (my $outputpm = "$output.pm") =~ s!::!/!g;
-        require "Progress/Any/Output/$outputpm";
+        require "Progress/Any/Output/$outputpm"; ## no critic: Modules::RequireBarewordIncludes
         $outputo = "Progress::Any::Output::$output"->new(@_);
     }
 

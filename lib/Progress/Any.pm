@@ -1,16 +1,16 @@
 package Progress::Any;
 
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
 use 5.010001;
 use strict;
 use warnings;
 
 use Time::Duration qw();
 use Time::HiRes qw(time);
+
+# AUTHORITY
+# DATE
+# DIST
+# VERSION
 
 sub import {
     my ($self, @args) = @_;
@@ -602,7 +602,8 @@ sub fill_template {
 =head1 SYNOPSIS
 
 Example of using in a script with terminal progress bar as output (progress bar
-will be cleared on C<finish()>):
+will be cleared on C<finish()>) (you'll need to install
+L<Progress::Any::Output::TermProgressBarColor> as well):
 
  use Progress::Any '$progress';
  use Progress::Any::Output 'TermProgressBarColor';
@@ -750,9 +751,10 @@ remaining time, and percentage of completion. One or more output modules
 
 In your modules, you typically only need to use Progress::Any, get one or more
 indicators, set target and update it during work. In your application, you use
-Progress::Any::Output and set/add one or more outputs to display the progress.
-By setting output only in the application and not in modules, you separate the
-formatting/display concern from the logic.
+L<Progress::Any::Output> and set/add one or more outputs to display the progress
+(you'll need to install one of the output modules as they are not included in
+this minimal distribution). By setting output only in the application and not in
+modules, you separate the formatting/display concern from the logic.
 
 Screenshots:
 
@@ -1111,7 +1113,7 @@ A literal C<%> sign.
 
 =head2 PROGRESS
 
-Boolean. Default 1. Can be set to 0 to display progress output.
+Boolean. Default 1. Can be set to 0 to supress display progress output.
 
 
 =head1 SEE ALSO
@@ -1121,7 +1123,9 @@ L<Progress::Any::Examples> distribution contains example scripts.
 Other progress modules on CPAN: L<Term::ProgressBar>,
 L<Term::ProgressBar::Simple>, L<Time::Progress>, among others.
 
-Output modules: C<Progress::Any::Output::*>
+Output modules: C<Progress::Any::Output::*>. You need to install at least one
+module to actually see progress being outputted/displayed somewhere, e.g. <> to
+L<Progress::Any::Output::TermProgressBarColor>.
 
 See examples on how Progress::Any is used by other modules: L<Perinci::CmdLine>
 (supplying progress object to functions), L<Git::Bunch> (using progress object).

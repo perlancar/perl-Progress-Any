@@ -651,7 +651,7 @@ Example of using in a module as well as script:
      my @urls = @_;
      return unless @urls;
      my $progress = Progress::Any->get_indicator(
-         task => "download", pos=>0, target=>~~@urls);
+         task => "download", pos=>0, target=>scalar @urls);
      for my $url (@urls) {
          # download the $url ...
          $progress->update(message => "Downloaded $url");
@@ -719,7 +719,7 @@ C<-progress>:
      opendir my($dh), $dir;
      my @ent = readdir($dh);
      $progress->pos(0);
-     $progress->target(~~@ent);
+     $progress->target(scalar @ent);
      for (@ent) {
          # do the check ...
          $progress->update(message => $_);
